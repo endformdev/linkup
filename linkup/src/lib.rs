@@ -1,4 +1,5 @@
 pub mod config;
+pub mod machine_fingerprint;
 pub mod serde_ext;
 
 mod headers;
@@ -18,6 +19,7 @@ use thiserror::Error;
 
 pub use headers::normalize_cookie_header;
 pub use headers::{HeaderMap, HeaderName};
+pub use machine_fingerprint::get_or_create_fingerprint;
 pub use memory_session_store::*;
 pub use name_gen::{random_animal, random_six_char};
 pub use session::*;
