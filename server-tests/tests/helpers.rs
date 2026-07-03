@@ -26,6 +26,7 @@ pub async fn setup_server(
             let state = ServerState {
                 session_allocator: session_allocator.clone(),
                 https_client: linkup_clients::https_client(),
+                upgrade_client: linkup_clients::https_client_http1(),
                 dns_catalog: DnsCatalog::new(),
                 https_certs_dir: PathBuf::default(),
                 worker_client: WorkerClient::new(

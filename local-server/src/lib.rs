@@ -1,7 +1,6 @@
 pub mod certificates;
 pub mod dns;
 mod handlers;
-mod ws;
 
 use axum::{
     Router,
@@ -21,7 +20,7 @@ use url::Url;
 
 use crate::dns::DnsCatalog;
 
-pub use linkup_clients::{HttpsClient, https_client};
+pub use linkup_clients::{HttpsClient, https_client, https_client_http1};
 
 type AxumHttpsClient = HttpsClient<axum::body::Body>;
 
@@ -30,6 +29,7 @@ pub struct ServerState {
     pub dns_catalog: DnsCatalog,
     pub https_certs_dir: PathBuf,
     pub https_client: AxumHttpsClient,
+    pub upgrade_client: AxumHttpsClient,
     pub session_allocator: SessionAllocator<MemoryStringStore>,
     pub worker_client: WorkerClient,
 }
@@ -75,6 +75,7 @@ pub async fn start(
     let server_state = ServerState {
         session_allocator: SessionAllocator::new(string_store),
         https_client: https_client(),
+        upgrade_client: https_client_http1(),
         dns_catalog: dns::DnsCatalog::new(),
         https_certs_dir: PathBuf::from(certs_dir),
         worker_client,

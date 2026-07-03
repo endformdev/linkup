@@ -9,16 +9,16 @@ path = "src/lib.rs"
 
 [dependencies]
 async-trait = { workspace = true }
-axum = { workspace = true, features = ["http2", "json", "ws"] }
-futures = { workspace = true }
+axum = { workspace = true, features = ["http1", "http2", "json", "tokio"] }
 http = { workspace = true }
+hyper = "1.8.1"
+hyper-util = { version = "0.1.10", features = ["tokio"] }
 linkup = { workspace = true }
 linkup-clients = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "signal", "rt-multi-thread"] }
-tokio-tungstenite = { workspace = true, features = ["rustls-tls-native-roots"] }
+tokio = { workspace = true, features = ["io-util", "macros", "signal", "rt-multi-thread"] }
 url = { workspace = true }
 
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }

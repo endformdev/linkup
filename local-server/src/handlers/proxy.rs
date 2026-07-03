@@ -3,17 +3,16 @@ use axum::{
     extract::{Request, State},
     response::{IntoResponse, Response},
 };
-use http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri};
+use http::{HeaderMap, HeaderName, StatusCode, Uri};
+use hyper::body::Incoming;
+use hyper::upgrade::OnUpgrade;
+use hyper_util::rt::TokioIo;
 use linkup::{TargetService, get_additional_headers, get_target_service};
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio::io::copy_bidirectional;
 
-use crate::{AxumHttpsClient, ServerState, handlers::ApiError, ws};
+use crate::{AxumHttpsClient, ServerState, handlers::ApiError};
 
-pub async fn handle_all(
-    State(server_state): State<ServerState>,
-    ws: ws::ExtractOptionalWebSocketUpgrade,
-    req: Request,
-) -> Response {
+pub async fn handle_all(State(server_state): State<ServerState>, req: Request) -> Response {
     let headers: linkup::HeaderMap = req.headers().into();
     let url = if req.uri().scheme().is_some() {
         req.uri().to_string()
@@ -52,104 +51,14 @@ pub async fn handle_all(
 
     let extra_headers = get_additional_headers(&url, &headers, &session_name, &target_service);
 
-    match ws.0 {
-        Some(downstream_upgrade) => {
-            let mut url = target_service.url;
-            if url.starts_with("http://") {
-                url = url.replace("http://", "ws://");
-            } else if url.starts_with("https://") {
-                url = url.replace("https://", "wss://");
-            }
-
-            let uri = url.parse::<Uri>().unwrap();
-            let host = uri.host().unwrap().to_string();
-            let mut upstream_request = uri.into_client_request().unwrap();
-
-            // Copy over all headers from the incoming request
-            let mut cookie_values: Vec<String> = Vec::new();
-            for (key, value) in req.headers() {
-                if key == http::header::COOKIE {
-                    if let Ok(cookie_value) = value.to_str().map(str::trim)
-                        && !cookie_value.is_empty()
-                    {
-                        cookie_values.push(cookie_value.to_string());
-                    }
-
-                    continue;
-                }
-
-                upstream_request.headers_mut().insert(key, value.clone());
-            }
-
-            if !cookie_values.is_empty() {
-                let combined = cookie_values.join("; ");
-                if let Ok(cookie_header_value) = HeaderValue::from_str(&combined) {
-                    upstream_request
-                        .headers_mut()
-                        .insert(http::header::COOKIE, cookie_header_value);
-                }
-            }
-
-            linkup::normalize_cookie_header(upstream_request.headers_mut());
-
-            // add the extra headers that linkup wants
-            let extra_http_headers: HeaderMap = extra_headers.into();
-            for (key, value) in extra_http_headers.iter() {
-                upstream_request.headers_mut().insert(key, value.clone());
-            }
-
-            // Overriding host header necessary for tokio_tungstenite
-            upstream_request
-                .headers_mut()
-                .insert(http::header::HOST, HeaderValue::from_str(&host).unwrap());
-
-            let (upstream_ws_stream, upstream_response) =
-                match tokio_tungstenite::connect_async(upstream_request).await {
-                    Ok(connection) => connection,
-                    Err(error) => match error {
-                        tokio_tungstenite::tungstenite::Error::Http(response) => {
-                            let (parts, body) = response.into_parts();
-                            let body = body.unwrap_or_default();
-
-                            return Response::from_parts(parts, Body::from(body));
-                        }
-                        error => {
-                            return Response::builder()
-                                .status(StatusCode::BAD_GATEWAY)
-                                .body(Body::from(error.to_string()))
-                                .unwrap();
-                        }
-                    },
-                };
-
-            let mut downstream_upgrade_response =
-                downstream_upgrade.on_upgrade(ws::context_handle_socket(upstream_ws_stream));
-
-            let downstream_response_headers = downstream_upgrade_response.headers_mut();
-
-            // The headers from the upstream response are more important - trust the upstream server
-            for (upstream_key, upstream_value) in upstream_response.headers() {
-                // Except for content encoding headers, cloudflare does _not_ like them..
-                if !DISALLOWED_HEADERS.contains(upstream_key) {
-                    downstream_response_headers
-                        .insert(upstream_key.clone(), upstream_value.clone());
-                }
-            }
-
-            downstream_response_headers.extend(linkup::allow_all_cors());
-
-            downstream_upgrade_response
-        }
-        None => {
-            handle_http_req(
-                req,
-                target_service,
-                extra_headers,
-                server_state.https_client,
-            )
-            .await
-        }
-    }
+    handle_http_req(
+        req,
+        target_service,
+        extra_headers,
+        server_state.https_client,
+        server_state.upgrade_client,
+    )
+    .await
 }
 
 const DISALLOWED_HEADERS: [HeaderName; 2] = [
@@ -162,7 +71,18 @@ async fn handle_http_req(
     target_service: TargetService,
     extra_headers: linkup::HeaderMap,
     client: AxumHttpsClient,
+    upgrade_client: AxumHttpsClient,
 ) -> Response {
+    let is_upgrade_request = req.headers().contains_key(http::header::UPGRADE)
+        && header_contains_token(req.headers(), http::header::CONNECTION, "upgrade");
+
+    let downstream_upgrade = if is_upgrade_request && req.extensions().get::<OnUpgrade>().is_some()
+    {
+        Some(hyper::upgrade::on(&mut req))
+    } else {
+        None
+    };
+
     *req.uri_mut() = Uri::try_from(&target_service.url).unwrap();
     let extra_http_headers: HeaderMap = extra_headers.into();
     req.headers_mut().extend(extra_http_headers);
@@ -170,12 +90,18 @@ async fn handle_http_req(
     req.headers_mut().remove(http::header::HOST);
     linkup::normalize_cookie_header(req.headers_mut());
 
-    if target_service.url.starts_with("http://") {
+    if downstream_upgrade.is_some() || target_service.url.starts_with("http://") {
         *req.version_mut() = http::Version::HTTP_11;
     }
 
     // Send the modified request to the target service.
-    let mut resp = match client.request(req).await {
+    let upstream_client = if downstream_upgrade.is_some() {
+        upgrade_client
+    } else {
+        client
+    };
+
+    let mut resp = match upstream_client.request(req).await {
         Ok(resp) => resp,
         Err(e) => {
             return ApiError::new(
@@ -189,7 +115,70 @@ async fn handle_http_req(
         }
     };
 
+    if let Some(downstream_upgrade) = downstream_upgrade
+        && resp.status() == StatusCode::SWITCHING_PROTOCOLS
+    {
+        return handle_upgrade_response(resp, downstream_upgrade);
+    }
+
     resp.headers_mut().extend(linkup::allow_all_cors());
 
     resp.into_response()
+}
+
+fn handle_upgrade_response(
+    mut upstream_resp: http::Response<Incoming>,
+    downstream_upgrade: OnUpgrade,
+) -> Response {
+    let upstream_upgrade = hyper::upgrade::on(&mut upstream_resp);
+    spawn_upgrade_tunnel(downstream_upgrade, upstream_upgrade);
+
+    let (parts, _) = upstream_resp.into_parts();
+    let mut downstream_resp = Response::from_parts(parts, Body::empty());
+
+    for header in &DISALLOWED_HEADERS {
+        downstream_resp.headers_mut().remove(header);
+    }
+    downstream_resp
+        .headers_mut()
+        .extend(linkup::allow_all_cors());
+
+    downstream_resp
+}
+
+fn spawn_upgrade_tunnel(downstream_upgrade: OnUpgrade, upstream_upgrade: OnUpgrade) {
+    tokio::spawn(async move {
+        let downstream = match downstream_upgrade.await {
+            Ok(upgraded) => upgraded,
+            Err(error) => {
+                eprintln!("Failed to upgrade downstream connection: {error}");
+                return;
+            }
+        };
+
+        let upstream = match upstream_upgrade.await {
+            Ok(upgraded) => upgraded,
+            Err(error) => {
+                eprintln!("Failed to upgrade upstream connection: {error}");
+                return;
+            }
+        };
+
+        let mut downstream = TokioIo::new(downstream);
+        let mut upstream = TokioIo::new(upstream);
+
+        if let Err(error) = copy_bidirectional(&mut downstream, &mut upstream).await {
+            eprintln!("Error proxying upgraded connection: {error}");
+        }
+    });
+}
+
+fn header_contains_token(headers: &HeaderMap, header: HeaderName, token: &str) -> bool {
+    headers.get_all(header).iter().any(|value| {
+        value.to_str().is_ok_and(|value| {
+            value
+                .split(',')
+                .any(|part| part.trim().eq_ignore_ascii_case(token))
+        })
+    })
 }
