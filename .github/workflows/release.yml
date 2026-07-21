@@ -1,11 +1,12 @@
 name: Create Release
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "Cargo.toml"
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "Cargo.toml"
+  workflow_dispatch:
 
 jobs:
   check_version:
@@ -168,50 +169,50 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  update_homebrew_formula:
-    needs: [build, check_version]
-    runs-on: ubuntu-latest
-    if: ${{ needs.check_version.outputs.version_changed == 'true' }}
-    steps:
-      - name: Checkout Homebrew Tap Repository
-        run: git clone https://github.com/mentimeter/homebrew-mentimeter.git
+  # update_homebrew_formula:
+  #   needs: [build, check_version]
+  #   runs-on: ubuntu-latest
+  #   if: ${{ needs.check_version.outputs.version_changed == 'true' }}
+  #   steps:
+  #     - name: Checkout Homebrew Tap Repository
+  #       run: git clone https://github.com/mentimeter/homebrew-mentimeter.git
 
-      - name: Update Homebrew Formula
-        run: |
-          RELEASE_VERSION="${{ needs.build.outputs.release_version }}"
-          FORMULA_PATH="homebrew-mentimeter/linkup.rb"
+  #     - name: Update Homebrew Formula
+  #       run: |
+  #         RELEASE_VERSION="${{ needs.build.outputs.release_version }}"
+  #         FORMULA_PATH="homebrew-mentimeter/linkup.rb"
 
-          if [ -z "$RELEASE_VERSION" ]; then
-            printf '%s\n' 'RELEASE_VERSION variable is empty'
-            exit 1
-          fi
+  #         if [ -z "$RELEASE_VERSION" ]; then
+  #           printf '%s\n' 'RELEASE_VERSION variable is empty'
+  #           exit 1
+  #         fi
 
-          MAC_ARM_SHA=$(echo "${{ needs.build.outputs.mac_arm_sha }}" | awk '{print $1}')
-          MAC_X86_SHA=$(echo "${{ needs.build.outputs.mac_x86_sha }}" | awk '{print $1}')
-          LINUX_ARM_SHA=$(echo "${{ needs.build.outputs.linux_arm_sha }}" | awk '{print $1}')
-          LINUX_X86_SHA=$(echo "${{ needs.build.outputs.linux_x86_sha }}" | awk '{print $1}')
+  #         MAC_ARM_SHA=$(echo "${{ needs.build.outputs.mac_arm_sha }}" | awk '{print $1}')
+  #         MAC_X86_SHA=$(echo "${{ needs.build.outputs.mac_x86_sha }}" | awk '{print $1}')
+  #         LINUX_ARM_SHA=$(echo "${{ needs.build.outputs.linux_arm_sha }}" | awk '{print $1}')
+  #         LINUX_X86_SHA=$(echo "${{ needs.build.outputs.linux_x86_sha }}" | awk '{print $1}')
 
-          # Update the SHA values
-          sed -i "s|MAC_ARM_SHA = \".*\"|MAC_ARM_SHA = \"$MAC_ARM_SHA\"|" "$FORMULA_PATH"
-          sed -i "s|MAC_X86_SHA = \".*\"|MAC_X86_SHA = \"$MAC_X86_SHA\"|" "$FORMULA_PATH"
-          sed -i "s|LINUX_ARM_SHA = \".*\"|LINUX_ARM_SHA = \"$LINUX_ARM_SHA\"|" "$FORMULA_PATH"
-          sed -i "s|LINUX_X86_SHA = \".*\"|LINUX_X86_SHA = \"$LINUX_X86_SHA\"|" "$FORMULA_PATH"
+  #         # Update the SHA values
+  #         sed -i "s|MAC_ARM_SHA = \".*\"|MAC_ARM_SHA = \"$MAC_ARM_SHA\"|" "$FORMULA_PATH"
+  #         sed -i "s|MAC_X86_SHA = \".*\"|MAC_X86_SHA = \"$MAC_X86_SHA\"|" "$FORMULA_PATH"
+  #         sed -i "s|LINUX_ARM_SHA = \".*\"|LINUX_ARM_SHA = \"$LINUX_ARM_SHA\"|" "$FORMULA_PATH"
+  #         sed -i "s|LINUX_X86_SHA = \".*\"|LINUX_X86_SHA = \"$LINUX_X86_SHA\"|" "$FORMULA_PATH"
 
-          # Update the URLs with the new release version
-          sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*aarch64-apple-darwin.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-aarch64-apple-darwin.tar.gz|" "$FORMULA_PATH"
-          sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*x86_64-apple-darwin.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-x86_64-apple-darwin.tar.gz|" "$FORMULA_PATH"
-          sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*aarch64-unknown-linux-gnu.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-aarch64-unknown-linux-gnu.tar.gz|" "$FORMULA_PATH"
-          sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*x86_64-unknown-linux-gnu.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-x86_64-unknown-linux-gnu.tar.gz|" "$FORMULA_PATH"
+  #         # Update the URLs with the new release version
+  #         sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*aarch64-apple-darwin.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-aarch64-apple-darwin.tar.gz|" "$FORMULA_PATH"
+  #         sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*x86_64-apple-darwin.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-x86_64-apple-darwin.tar.gz|" "$FORMULA_PATH"
+  #         sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*aarch64-unknown-linux-gnu.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-aarch64-unknown-linux-gnu.tar.gz|" "$FORMULA_PATH"
+  #         sed -i "s|https://github.com/mentimeter/linkup/releases/download/[^/]*/linkup-[^/]*x86_64-unknown-linux-gnu.tar.gz|https://github.com/mentimeter/linkup/releases/download/$RELEASE_VERSION/linkup-x86_64-unknown-linux-gnu.tar.gz|" "$FORMULA_PATH"
 
-          cd homebrew-mentimeter
+  #         cd homebrew-mentimeter
 
-          git remote set-url origin https://x-access-token:${COMMIT_TOKEN}@github.com/mentimeter/homebrew-mentimeter.git
-          git config --global user.name "mentibot"
-          git config --global user.email "122382604+mentibot@users.noreply.github.com"
+  #         git remote set-url origin https://x-access-token:${COMMIT_TOKEN}@github.com/mentimeter/homebrew-mentimeter.git
+  #         git config --global user.name "mentibot"
+  #         git config --global user.email "122382604+mentibot@users.noreply.github.com"
 
-          git add linkup.rb
-          git commit -m "Update Linkup formula to $RELEASE_VERSION"
+  #         git add linkup.rb
+  #         git commit -m "Update Linkup formula to $RELEASE_VERSION"
 
-          git push origin HEAD:main
-        env:
-          COMMIT_TOKEN: ${{ secrets.COMMIT_TOKEN }}
+  #         git push origin HEAD:main
+  #       env:
+  #         COMMIT_TOKEN: ${{ secrets.COMMIT_TOKEN }}
