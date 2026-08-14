@@ -3,6 +3,7 @@ use std::{env, fs, io::ErrorKind, path::PathBuf, process};
 use anyhow::{Context, anyhow};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use log::error;
 use thiserror::Error;
 
 pub use anyhow::Result;
@@ -11,6 +12,7 @@ pub use linkup::Version;
 mod commands;
 mod config;
 mod env_files;
+mod machine;
 mod release;
 mod services;
 mod session;
@@ -19,6 +21,7 @@ mod state;
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const LINKUP_CONFIG_ENV: &str = "LINKUP_CONFIG";
 const LINKUP_DIR: &str = ".linkup";
+const LINKUP_MACHINE_ID_FILE: &str = "machine-id";
 const LINKUP_STATE_FILE: &str = "state";
 
 pub enum InstallationMethod {
@@ -242,13 +245,24 @@ async fn main() {
     let env = env_logger::Env::new().filter_or("LINKUP_LOG", "info");
     env_logger::Builder::from_env(env).init();
 
-    let cli = Cli::parse();
-
     if let Err(error) = ensure_linkup_dir() {
         log::error!("Exited with error: {error}");
 
         process::exit(1);
     }
+
+    match crate::machine::load_or_create() {
+        Ok(machine_id) => {
+            log::debug!("Using machine ID {machine_id}");
+        }
+        Err(error) => {
+            error!("Failed to load or create Machine ID: {error}");
+
+            process::exit(1);
+        }
+    };
+
+    let cli = Cli::parse();
 
     display_update_message(&cli.command).await;
 

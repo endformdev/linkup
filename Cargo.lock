@@ -1862,6 +1862,7 @@ dependencies = [
  "tokio",
  "unicase",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -3963,8 +3964,19 @@ checksum = "ddd74a9687298c6858e9b88ec8935ec45d22e8fd5e6394fa1bd4e99a87789c76"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
+ "rand 0.10.1",
  "serde_core",
+ "uuid-rng-internal",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "uuid-rng-internal"
+version = "1.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dff7387287837acf196f2596a6216f94c555d947d5331e1cc48393131020119"
+dependencies = [
+ "rand 0.10.1",
 ]
 
 [[package]]
