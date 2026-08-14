@@ -13,20 +13,7 @@ use crate::{handlers, worker_state::WorkerState};
 
 pub fn router(state: WorkerState) -> Router {
     Router::new()
-        // ----------------------------------------------------------------------------------------
-        // --- V1
-        // ----------------------------------------------------------------------------------------
-        .route(
-            "/linkup/local-session",
-            post(handlers::v1::local_session::handle_post),
-        )
-        .route(
-            "/linkup/preview-session",
-            post(handlers::v1::preview_session::handle_post),
-        )
-        .route("/linkup/tunnel", get(handlers::v1::tunnel::handle_get))
-        .route("/linkup/check", get(handlers::always_ok))
-        .route("/linkup/no-tunnel", get(no_tunnel))
+        .route("/linkup/check", get(async || "OK"))
         // ----------------------------------------------------------------------------------------
         // --- V2
         // ----------------------------------------------------------------------------------------
@@ -46,14 +33,6 @@ pub fn router(state: WorkerState) -> Router {
         .with_state(state)
 }
 
-async fn no_tunnel() -> impl IntoResponse {
-    (
-        StatusCode::UNPROCESSABLE_ENTITY,
-        "This linkup session has no associated tunnel / was started with --no-tunnel",
-    )
-        .into_response()
-}
-
 async fn authenticate(
     State(state): State<WorkerState>,
     headers: HeaderMap,
@@ -61,32 +40,30 @@ async fn authenticate(
     next: Next,
 ) -> impl IntoResponse {
     if request.uri().path().starts_with("/linkup") {
-        if request.uri().path() == "/linkup/local-session" {
-            match headers.get("x-linkup-version") {
-                Some(value) => match Version::try_from(value.to_str().unwrap()) {
-                    Ok(client_version) => {
-                        if client_version < state.min_supported_client_version
-                            && client_version.channel() != VersionChannel::Beta
-                        {
-                            return (
-                                    StatusCode::UNAUTHORIZED,
-                                    "Your Linkup CLI is outdated, please upgrade to the latest version.",
-                                )
-                                    .into_response();
-                        }
-                    }
-                    Err(_) => {
-                        return (StatusCode::UNAUTHORIZED, "Invalid x-linkup-version header.")
+        match headers.get("x-linkup-version") {
+            Some(value) => match Version::try_from(value.to_str().unwrap()) {
+                Ok(client_version) => {
+                    if client_version < state.min_supported_client_version
+                        && client_version.channel() != VersionChannel::Beta
+                    {
+                        return (
+                            StatusCode::UNAUTHORIZED,
+                            "Your Linkup CLI is outdated, please upgrade to the latest version.",
+                        )
                             .into_response();
                     }
-                },
-                None => {
-                    return (
-                        StatusCode::UNAUTHORIZED,
-                        "No x-linkup-version header, please upgrade your Linkup CLI.",
-                    )
+                }
+                Err(_) => {
+                    return (StatusCode::UNAUTHORIZED, "Invalid x-linkup-version header.")
                         .into_response();
                 }
+            },
+            None => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    "No x-linkup-version header, please upgrade your Linkup CLI.",
+                )
+                    .into_response();
             }
         }
 

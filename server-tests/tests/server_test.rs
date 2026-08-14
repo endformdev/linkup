@@ -1,5 +1,8 @@
 use helpers::ServerKind;
-use linkup::{Domain, NameKind, SessionService, UpsertSessionRequest};
+use linkup::{
+    Domain, NameKind, SessionResponse, SessionService, TunneledSessionResponse,
+    UpsertSessionRequest,
+};
 use reqwest::Url;
 
 use crate::helpers::{create_session_request, post, setup_server};
@@ -49,26 +52,28 @@ async fn worker_no_such_session() {
 
 #[tokio::test]
 #[ignore = "requires running wrangler dev"]
-async fn worker_can_create_session() {
+async fn worker_can_create_tunneled_session() {
     let (url, _) = setup_server(ServerKind::Worker).await;
 
     let session_req = create_session_request("potatoname".to_string(), None);
-    let response = post(format!("{}/linkup/local-session", url), session_req).await;
+    let response = post(format!("{}/linkup/v2/sessions/tunneled", url), session_req).await;
 
     assert_eq!(response.status(), reqwest::StatusCode::OK);
-    assert_eq!(response.text().await.unwrap(), "potatoname");
+    let response: TunneledSessionResponse = response.json().await.unwrap();
+    assert_eq!(response.session_name, "potatoname");
 }
 
 #[tokio::test]
 #[ignore = "requires running wrangler dev"]
-async fn worker_can_create_preview() {
+async fn worker_can_create_preview_session() {
     let (url, _) = setup_server(ServerKind::Worker).await;
 
     let session_req = create_preview_request(None);
-    let response = post(format!("{}/linkup/preview-session", url), session_req).await;
+    let response = post(format!("{}/linkup/v2/sessions/preview", url), session_req).await;
 
     assert_eq!(response.status(), reqwest::StatusCode::OK);
-    assert_eq!(response.text().await.unwrap().len(), 6);
+    let response: SessionResponse = response.json().await.unwrap();
+    assert_eq!(response.session_name.len(), 6);
 }
 
 pub async fn get(url: String) -> reqwest::Response {

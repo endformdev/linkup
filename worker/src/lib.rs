@@ -14,7 +14,7 @@ mod worker_state;
 mod ws;
 
 pub(crate) const SEVEN_DAYS_MILLIS: u64 = 7 * 24 * 60 * 60 * 1000;
-pub(crate) const MIN_SUPPORTED_CLIENT_VERSION: &str = "2.1.0";
+pub(crate) const MIN_SUPPORTED_CLIENT_VERSION: &str = "5.0.0";
 
 #[event(fetch)]
 async fn fetch(
