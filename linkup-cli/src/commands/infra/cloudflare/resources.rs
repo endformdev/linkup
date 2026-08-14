@@ -922,8 +922,7 @@ impl TargetCfResources {
         }
 
         // Cleanup all the tunnels
-        let tunnel_prefix =
-            cloudflare::linkup::tunnel_prefix(cloudflare_client, &self.tunnel_zone_id).await?;
+        let tunnel_prefix = tunnel_prefix(cloudflare_client, &self.tunnel_zone_id).await?;
         let req = cloudflare::endpoints::cfd_tunnel::list_tunnels::ListTunnels {
             account_identifier: &self.account_id,
             params: cloudflare::endpoints::cfd_tunnel::list_tunnels::Params {
@@ -1182,4 +1181,20 @@ pub fn generate_secret() -> String {
     let bytes: [u8; 32] = rand::rng().random();
 
     base64::Engine::encode(&base64::prelude::BASE64_STANDARD, bytes)
+}
+
+async fn tunnel_prefix(
+    client: &cloudflare::framework::async_api::Client,
+    zone_id: &str,
+) -> Result<String, cloudflare::framework::response::ApiFailure> {
+    let req = cloudflare::endpoints::zone::ZoneDetails {
+        identifier: zone_id,
+    };
+
+    let zone = client.request(&req).await?;
+
+    let zone_name = zone.result.name.replace(".", "-");
+    let tunnel_name = format!("linkup-tunnel-{}-", zone_name);
+
+    Ok(tunnel_name)
 }
