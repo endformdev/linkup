@@ -56,7 +56,7 @@ async fn worker_can_create_tunneled_session() {
     let (url, _) = setup_server(ServerKind::Worker).await;
 
     let session_req = create_session_request("potatoname".to_string(), None);
-    let response = post(format!("{}/linkup/v2/sessions/tunneled", url), session_req).await;
+    let response = post(format!("{}/linkup/sessions/tunneled", url), session_req).await;
 
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let response: TunneledSessionResponse = response.json().await.unwrap();
@@ -69,7 +69,7 @@ async fn worker_can_create_preview_session() {
     let (url, _) = setup_server(ServerKind::Worker).await;
 
     let session_req = create_preview_request(None);
-    let response = post(format!("{}/linkup/v2/sessions/preview", url), session_req).await;
+    let response = post(format!("{}/linkup/sessions/preview", url), session_req).await;
 
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let response: SessionResponse = response.json().await.unwrap();

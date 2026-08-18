@@ -14,16 +14,13 @@ use crate::{handlers, worker_state::WorkerState};
 pub fn router(state: WorkerState) -> Router {
     Router::new()
         .route("/linkup/check", get(async || "OK"))
-        // ----------------------------------------------------------------------------------------
-        // --- V2
-        // ----------------------------------------------------------------------------------------
         .route(
-            "/linkup/v2/sessions/preview",
-            post(handlers::v2::sessions::upsert_preview),
+            "/linkup/sessions/preview",
+            post(handlers::sessions::upsert_preview),
         )
         .route(
-            "/linkup/v2/sessions/tunneled",
-            post(handlers::v2::sessions::upsert_tunneled),
+            "/linkup/sessions/tunneled",
+            post(handlers::sessions::upsert_tunneled),
         )
         .route_layer(from_fn_with_state(state.clone(), authenticate))
         // ----------------------------------------------------------------------------------------

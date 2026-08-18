@@ -52,14 +52,14 @@ impl WorkerClient {
         &self,
         params: &TunneledSessionRequest,
     ) -> Result<TunneledSessionResponse, Error> {
-        self.post("/linkup/v2/sessions/tunneled", params).await
+        self.post("/linkup/sessions/tunneled", params).await
     }
 
     pub async fn preview_session(
         &self,
         params: &PreviewSessionRequest,
     ) -> Result<SessionResponse, Error> {
-        self.post("/linkup/v2/sessions/preview", params).await
+        self.post("/linkup/sessions/preview", params).await
     }
 
     // TODO(@augustoccesar)[2026-04-21]: This is the same on local_server. Can probably be combined
