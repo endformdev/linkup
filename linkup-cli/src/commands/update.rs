@@ -50,10 +50,10 @@ pub async fn update(args: &Args) -> Result<()> {
 
             println!(
                 "Updating from version '{}' ({}) to '{}' ({})...",
-                &current_version,
-                &current_version.channel(),
-                &update.version,
-                &update.version.channel()
+                current_version,
+                current_version.channel(),
+                update.version,
+                update.version.channel()
             );
 
             let new_linkup_path = update

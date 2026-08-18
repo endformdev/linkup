@@ -285,7 +285,7 @@ mod test {
     impl Drop for TestFile {
         fn drop(&mut self) {
             if let Err(err) = std::fs::remove_file(&self.path) {
-                println!("failed to remove file {}: {}", &self.path.display(), err);
+                println!("failed to remove file {}: {}", self.path.display(), err);
             }
         }
     }

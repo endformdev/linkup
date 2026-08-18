@@ -957,13 +957,13 @@ impl TargetCfResources {
                         Ok(_) => {
                             notifier.notify(&format!(
                                 "Tunnel '{}' ({}) deleted",
-                                &tunnel.name, &tunnel.id
+                                tunnel.name, tunnel.id
                             ));
                         }
                         Err(_) => {
                             notifier.notify(&format!(
                                 "Failed to delete tunnel '{}' ({})",
-                                &tunnel.name, &tunnel.id
+                                tunnel.name, tunnel.id
                             ));
                         }
                     }

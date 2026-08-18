@@ -102,7 +102,7 @@ async fn start_server_https(server_state: ServerState) {
         Err(error) => {
             eprintln!(
                 "Failed to load certificates from {:?} into SNI: {}",
-                &server_state.https_certs_dir, error
+                server_state.https_certs_dir, error
             );
             return;
         }
@@ -116,7 +116,7 @@ async fn start_server_https(server_state: ServerState) {
     let app = router(server_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 443));
-    println!("HTTPS listening on {}", &addr);
+    println!("HTTPS listening on {}", addr);
 
     axum_server::bind_rustls(addr, RustlsConfig::from_config(Arc::new(server_config)))
         .serve(app.into_make_service())
@@ -128,7 +128,7 @@ async fn start_server_http(server_state: ServerState) {
     let app = router(server_state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 80));
-    println!("HTTP listening on {}", &addr);
+    println!("HTTP listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

@@ -496,7 +496,7 @@ mod tests {
         // Standard named subdomain
         assert_eq!(
             get_target_service(
-                &format!("http://{}.example.com/?a=b", &name),
+                &format!("http://{}.example.com/?a=b", name),
                 &HeaderMap::new(),
                 &config,
                 &name
@@ -510,7 +510,7 @@ mod tests {
         // With path
         assert_eq!(
             get_target_service(
-                &format!("http://{}.example.com/a/b/c/?a=b", &name),
+                &format!("http://{}.example.com/a/b/c/?a=b", name),
                 &HeaderMap::new(),
                 &config,
                 &name
@@ -524,7 +524,7 @@ mod tests {
         // Test rewrites
         assert_eq!(
             get_target_service(
-                &format!("http://{}.example.com/foo/b/c/?a=b", &name),
+                &format!("http://{}.example.com/foo/b/c/?a=b", name),
                 &HeaderMap::new(),
                 &config,
                 &name
@@ -538,7 +538,7 @@ mod tests {
         // Test domain routes
         assert_eq!(
             get_target_service(
-                &format!("http://{}.example.com/api/v1/?a=b", &name),
+                &format!("http://{}.example.com/api/v1/?a=b", name),
                 &HeaderMap::new(),
                 &config,
                 &name

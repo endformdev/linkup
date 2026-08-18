@@ -30,7 +30,7 @@ pub async fn uninstall(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
 
     let exe_path = linkup_exe_path()?;
 
-    log::debug!("Linkup exe path: {:?}", &exe_path);
+    log::debug!("Linkup exe path: {:?}", exe_path);
     match InstallationMethod::current()? {
         InstallationMethod::Brew => {
             log::debug!("Uninstalling linkup from Homebrew");

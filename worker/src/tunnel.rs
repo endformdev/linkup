@@ -119,7 +119,7 @@ pub async fn upsert_tunnel(
 ) -> Result<TunnelData, String> {
     let kv = &state.tunnels_kv;
 
-    let tunnel_name = format!("{}{}", &state.tunnel_prefix, machine_id);
+    let tunnel_name = format!("{}{}", state.tunnel_prefix, machine_id);
     let tunnel_data: Option<TunnelData> = kv
         .get(&tunnel_name)
         .json()
@@ -214,7 +214,7 @@ async fn create_tunnel(
     let tunnel_data = TunnelData {
         account_id: account_id.to_string(),
         name: tunnel_name.to_string(),
-        url: format!("https://{}.{}", &tunnel_name, &zone.name),
+        url: format!("https://{}.{}", tunnel_name, zone.name),
         id: tunnel.id.to_string(),
         secret: tunnel_secret,
         last_started: worker::Date::now().as_millis(),

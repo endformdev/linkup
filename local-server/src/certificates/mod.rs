@@ -153,8 +153,8 @@ pub fn create_domain_cert(certs_dir: &Path, domain: &str) -> (Certificate, KeyPa
     let cert = params.signed_by(&key_pair, &issuer).unwrap();
 
     let escaped_domain = domain.replace("*", "wildcard_");
-    let cert_path = certs_dir.join(format!("{}.cert.pem", &escaped_domain));
-    let key_path = certs_dir.join(format!("{}.key.pem", &escaped_domain));
+    let cert_path = certs_dir.join(format!("{}.cert.pem", escaped_domain));
+    let key_path = certs_dir.join(format!("{}.key.pem", escaped_domain));
     fs::write(cert_path, cert.pem()).unwrap();
     fs::write(key_path, key_pair.serialize_pem()).unwrap();
 
