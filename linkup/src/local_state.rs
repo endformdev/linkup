@@ -16,18 +16,18 @@ pub struct LocalState {
     pub version: u8,
     pub worker_url: Url,
     pub worker_token: String,
-    pub tunnel: Option<Url>,
+    pub tunnel_url: Option<Url>,
     pub default_session: Option<String>,
     pub sessions: BTreeMap<String, SessionState>,
 }
 
 impl LocalState {
-    pub fn new(worker_url: Url, worker_token: String, tunnel: Option<Url>) -> Self {
+    pub fn new(worker_url: Url, worker_token: String) -> Self {
         Self {
             version: LOCAL_STATE_VERSION,
             worker_url,
             worker_token,
-            tunnel,
+            tunnel_url: None,
             default_session: None,
             sessions: BTreeMap::new(),
         }

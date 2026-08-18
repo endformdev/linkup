@@ -38,7 +38,7 @@ impl StateStore {
         }
 
         state.sessions.insert(name, session);
-        state.tunnel = Some(tunnel_url);
+        state.tunnel_url = Some(tunnel_url);
 
         let yaml = serde_yaml::to_string(&*state)?;
         fs::write(self.path.as_ref(), yaml)?;
@@ -86,7 +86,7 @@ mod tests {
             version: LOCAL_STATE_VERSION,
             worker_url: Url::parse("https://worker.example.com").unwrap(),
             worker_token: "token".to_string(),
-            tunnel: None,
+            tunnel_url: None,
             default_session: None,
             sessions: BTreeMap::new(),
         };
@@ -114,7 +114,7 @@ mod tests {
             serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(persisted.default_session.as_deref(), Some("main"));
         assert_eq!(persisted.sessions.len(), 2);
-        assert_eq!(persisted.tunnel, Some(tunnel_url));
+        assert_eq!(persisted.tunnel_url, Some(tunnel_url));
 
         store.delete_session("main").await.unwrap();
         let persisted: LocalState =

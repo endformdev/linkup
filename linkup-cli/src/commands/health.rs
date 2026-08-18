@@ -207,8 +207,8 @@ impl LinkupServices {
 
         let tunnel_url = state
             .as_ref()
-            .filter(|state| state.should_use_tunnel())
-            .map(|state| state.get_tunnel_url().join("/linkup/check"))
+            .and_then(|state| state.tunnel_url.as_ref())
+            .map(|tunnel_url| tunnel_url.join("/linkup/check"))
             .transpose()?;
         let tunnel = tunnel_url.map(|url| thread::spawn(move || LinkupService::load(url)));
 

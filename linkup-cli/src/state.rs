@@ -11,7 +11,6 @@ use linkup::{
 };
 use rand::distr::{Alphanumeric, SampleString};
 use serde::Serialize;
-use url::Url;
 
 use crate::{LINKUP_STATE_FILE, Result, config::load_config_with_override, linkup_file_path};
 
@@ -46,7 +45,6 @@ impl State {
         let state = LocalState::new(
             config.linkup.worker_url.clone(),
             config.linkup.worker_token.clone(),
-            Some(Url::parse("http://tunnel-not-yet-set").expect("default URL should parse")),
         );
         let session = session_from_config(config, &config_path);
 
@@ -62,21 +60,6 @@ impl State {
             .context("Failed to serialize the local state into YAML")?;
 
         fs::write(path, yaml).with_context(|| format!("Failed to write state file to {path:?}"))
-    }
-
-    pub fn should_use_tunnel(&self) -> bool {
-        self.tunnel.is_some()
-    }
-
-    pub fn get_tunnel_url(&self) -> Url {
-        match &self.tunnel {
-            Some(url) => url.clone(),
-            None => {
-                let mut remote = self.worker_url.clone();
-                remote.set_path("/linkup/no-tunnel");
-                remote
-            }
-        }
     }
 }
 
@@ -212,9 +195,8 @@ domains:
         let first = session_from_config(config.clone(), Path::new("/first/linkup.yml"));
         let second = session_from_config(config, Path::new("/second/linkup.yml"));
         let mut state = State::from(LocalState::new(
-            Url::parse("https://remote-linkup.example.com").unwrap(),
+            url::Url::parse("https://remote-linkup.example.com").unwrap(),
             "token".to_string(),
-            None,
         ));
         state.default_session = Some("main".to_string());
         state.sessions.insert("main".to_string(), first);

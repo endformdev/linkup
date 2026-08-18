@@ -42,14 +42,8 @@ pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineI
     restore_linkup_env(&state);
     log::info!("Finished setting up!");
 
-    if state.should_use_tunnel() {
-        let tunnel_data =
-            tunnel_data.context("No tunnel data returned while restoring sessions")?;
-
-        services::cloudflared::start(&tunnel_data).await?;
-    } else {
-        log::info!("Skipping. State file requested no tunnel.");
-    }
+    let tunnel_data = tunnel_data.context("No tunnel data returned while restoring sessions")?;
+    services::cloudflared::start(&tunnel_data).await?;
 
     let rows = state
         .sessions
