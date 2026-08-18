@@ -3,7 +3,7 @@ use axum::{
     extract::{Request, State},
     middleware::{Next, from_fn_with_state},
     response::IntoResponse,
-    routing::{any, get, post},
+    routing::{any, delete, get, post},
 };
 use http::{HeaderMap, StatusCode};
 use linkup::{Version, VersionChannel};
@@ -21,6 +21,10 @@ pub fn router(state: WorkerState) -> Router {
         .route(
             "/linkup/sessions/tunneled",
             post(handlers::sessions::upsert_tunneled),
+        )
+        .route(
+            "/linkup/sessions/{name}",
+            delete(handlers::sessions::delete),
         )
         .route_layer(from_fn_with_state(state.clone(), authenticate))
         // ----------------------------------------------------------------------------------------

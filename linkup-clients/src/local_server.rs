@@ -69,6 +69,20 @@ impl LocalServerClient {
             .await
     }
 
+    pub async fn delete_session(&self, session_name: &str) -> Result<(), Error> {
+        let endpoint = self.url.join(&format!("/linkup/sessions/{session_name}"))?;
+        let response = self.inner.delete(endpoint).send().await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Error::Response(
+                response.status(),
+                response.text().await.unwrap_or_else(|_| "".to_string()),
+            ))
+        }
+    }
+
     pub async fn list_dns_domains(&self) -> Result<DnsListResponse, Error> {
         self.get("/linkup/dns").await
     }

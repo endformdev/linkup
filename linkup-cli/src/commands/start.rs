@@ -54,7 +54,7 @@ pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineI
         .collect::<Vec<_>>();
 
     println!();
-    print_sessions_table(&rows, state.default_session.as_deref());
+    print_sessions_table(&rows, state.main_session.as_deref());
 
     Ok(())
 }

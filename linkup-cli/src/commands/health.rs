@@ -164,7 +164,7 @@ impl States {
                 "{:>offset$}- [{}] default: {} ({} sessions)",
                 "",
                 state_file_name,
-                state.default_session.as_deref().unwrap_or("none"),
+                state.main_session.as_deref().unwrap_or("none"),
                 state.sessions.len(),
             )?;
         }

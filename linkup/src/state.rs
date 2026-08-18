@@ -20,7 +20,7 @@ pub struct State {
     pub worker_url: Url,
     pub worker_token: String,
     pub tunnel_url: Option<Url>,
-    pub default_session: Option<String>,
+    pub main_session: Option<String>,
     pub sessions: BTreeMap<String, SessionState>,
 }
 
@@ -31,13 +31,13 @@ impl State {
             worker_url,
             worker_token,
             tunnel_url: None,
-            default_session: None,
+            main_session: None,
             sessions: BTreeMap::new(),
         }
     }
 
-    pub fn default_session(&self) -> Option<(&str, &SessionState)> {
-        let name = self.default_session.as_deref()?;
+    pub fn main_session(&self) -> Option<(&str, &SessionState)> {
+        let name = self.main_session.as_deref()?;
         self.sessions.get(name).map(|session| (name, session))
     }
 

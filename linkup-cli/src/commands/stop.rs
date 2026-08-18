@@ -42,7 +42,7 @@ pub fn stop(_args: &Args, clear_env: bool) -> Result<()> {
     Ok(())
 }
 
-fn remove_service_env(directory: String, config_path: String) -> Result<()> {
+pub(crate) fn remove_service_env(directory: String, config_path: String) -> Result<()> {
     let config_dir = Path::new(&config_path)
         .parent()
         .with_context(|| format!("config_path '{directory}' does not have a parent directory"))?;

@@ -1,5 +1,6 @@
 use linkup::{
-    PreviewSessionRequest, SessionResponse, TunneledSessionRequest, TunneledSessionResponse,
+    DeleteSessionRequest, PreviewSessionRequest, SessionResponse, TunneledSessionRequest,
+    TunneledSessionResponse,
 };
 use reqwest::{StatusCode, header};
 use serde::{Serialize, de::DeserializeOwned};
@@ -60,6 +61,31 @@ impl WorkerClient {
         params: &PreviewSessionRequest,
     ) -> Result<SessionResponse, Error> {
         self.post("/linkup/sessions/preview", params).await
+    }
+
+    pub async fn delete_session(
+        &self,
+        session_name: &str,
+        params: &DeleteSessionRequest,
+    ) -> Result<(), Error> {
+        let params = serde_json::to_string(params)?;
+        let endpoint = self.url.join(&format!("/linkup/sessions/{session_name}"))?;
+        let response = self
+            .inner
+            .delete(endpoint)
+            .header("Content-Type", "application/json")
+            .body(params)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Error::Response(
+                response.status(),
+                response.text().await.unwrap_or_else(|_| "".to_string()),
+            ))
+        }
     }
 
     // TODO(@augustoccesar)[2026-04-21]: This is the same on local_server. Can probably be combined

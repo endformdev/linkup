@@ -63,17 +63,37 @@ impl WorkerSessionRegistry {
         let mut animal_attempts = 0;
 
         loop {
-            let candidate = if animal_attempts < 20 {
+            let suffix = if animal_attempts < 20 {
                 animal_attempts += 1;
                 random_animal()
             } else {
                 random_six_char()
             };
+            let candidate = suffix;
 
             if self.read(&candidate).await?.is_none() {
                 return Ok(candidate);
             }
         }
+    }
+
+    pub async fn delete(
+        &self,
+        name: &str,
+        session_token: &str,
+    ) -> Result<(), SessionRegistryError> {
+        let session = self
+            .find(name)
+            .await?
+            .ok_or(SessionRegistryError::SessionNotFound)?;
+        if session.session_token != session_token {
+            return Err(SessionRegistryError::SessionTokenMismatch);
+        }
+
+        self.kv
+            .delete(name)
+            .await
+            .map_err(|error| SessionRegistryError::Delete(error.to_string()))
     }
 
     async fn read(&self, name: &str) -> Result<Option<String>, SessionRegistryError> {
@@ -121,12 +141,18 @@ pub enum SessionRegistryError {
     Read(String),
     #[error("Could not write session: {0}")]
     Write(String),
+    #[error("Could not delete session: {0}")]
+    Delete(String),
     #[error("Invalid session data: {0}")]
     InvalidSession(String),
     #[error("Session name is empty")]
     EmptySessionName,
     #[error("Session with name already exists")]
     SessionNameConflict,
+    #[error("Session not found")]
+    SessionNotFound,
+    #[error("Session token does not match")]
+    SessionTokenMismatch,
     #[error("No session found for request {0}")]
     NoSessionForRequest(String),
 }

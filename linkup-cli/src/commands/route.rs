@@ -50,7 +50,7 @@ pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
     let session_name = args
         .session
         .clone()
-        .or_else(|| state.default_session.clone())
+        .or_else(|| state.main_session.clone())
         .context("No default session is configured; specify one with --session")?;
     let mut session = state
         .sessions

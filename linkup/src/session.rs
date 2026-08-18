@@ -80,6 +80,11 @@ impl From<&LocalTunneledSessionRequest> for TunneledSessionRequest {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct DeleteSessionRequest {
+    pub session_token: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SessionResponse {
     pub session_name: String,
 }

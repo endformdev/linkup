@@ -100,6 +100,13 @@ pub async fn upsert_tunneled_session(
     Ok(local_server_client.tunneled_session(&request).await?)
 }
 
+pub async fn delete_session(session_name: &str) -> Result<()> {
+    log::info!("Deleting session...");
+    let local_server_client = LocalServerClient::new(&url());
+
+    Ok(local_server_client.delete_session(session_name).await?)
+}
+
 fn spawn_process() -> Result<()> {
     log::debug!("Starting {}", NAME);
 

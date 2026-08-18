@@ -69,8 +69,8 @@ impl StateStore {
             .map_err(|_| StateStoreError::LockPoisoned)?;
         let mut next = state.clone();
 
-        if next.default_session.is_none() {
-            next.default_session = Some(name.clone());
+        if next.main_session.is_none() {
+            next.main_session = Some(name.clone());
         }
 
         next.sessions.insert(name, session);
@@ -86,16 +86,15 @@ impl StateStore {
             .state
             .write()
             .map_err(|_| StateStoreError::LockPoisoned)?;
+        if state.main_session.as_deref() == Some(name) {
+            return Err(StateStoreError::CannotDeleteMainSession);
+        }
         let Some(session) = state.sessions.get(name) else {
             return Ok(None);
         };
         let proxy_session = Session::try_from(session)?;
         let mut next = state.clone();
         next.sessions.remove(name);
-
-        if next.default_session.as_deref() == Some(name) {
-            next.default_session = next.sessions.keys().next().cloned();
-        }
 
         self.persist(&next)?;
         *state = next;
@@ -176,6 +175,8 @@ pub enum StateStoreError {
     Config(#[from] ConfigError),
     #[error("No session found for request {0}")]
     NoSessionForRequest(String),
+    #[error("The main session cannot be deleted")]
+    CannotDeleteMainSession,
 }
 
 #[cfg(test)]
@@ -192,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn persists_sessions_and_keeps_the_first_as_default() {
+    fn persists_sessions_and_keeps_the_main_session() {
         let path = std::env::temp_dir().join(format!("linkup-state-{}", MachineId::generate()));
         let store = StateStore::create(path.clone(), empty_state()).unwrap();
         let session = SessionState {
@@ -226,14 +227,18 @@ mod tests {
             .unwrap();
 
         let persisted = StateStore::load(path.clone()).unwrap().state().unwrap();
-        assert_eq!(persisted.default_session.as_deref(), Some("main"));
+        assert_eq!(persisted.main_session.as_deref(), Some("main"));
         assert_eq!(persisted.sessions.len(), 2);
         assert_eq!(persisted.tunnel_url, Some(tunnel_url));
 
-        store.delete_session("main").unwrap();
+        let error = store.delete_session("main").unwrap_err();
+        assert!(matches!(error, StateStoreError::CannotDeleteMainSession));
+
+        store.delete_session("agent").unwrap();
         let persisted = StateStore::load(path.clone()).unwrap().state().unwrap();
-        assert_eq!(persisted.default_session.as_deref(), Some("agent"));
-        assert!(!persisted.sessions.contains_key("main"));
+        assert_eq!(persisted.main_session.as_deref(), Some("main"));
+        assert!(persisted.sessions.contains_key("main"));
+        assert!(!persisted.sessions.contains_key("agent"));
 
         fs::remove_file(path).unwrap();
     }

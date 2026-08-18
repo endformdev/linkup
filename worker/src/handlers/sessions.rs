@@ -1,9 +1,13 @@
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{Path, State},
+    response::IntoResponse,
+};
 
 use http::StatusCode;
 use linkup::{
-    PREVIEW_SESSION_TOKEN, PreviewSessionRequest, Session, SessionKind, SessionResponse,
-    TunneledSessionRequest, TunneledSessionResponse,
+    DeleteSessionRequest, PREVIEW_SESSION_TOKEN, PreviewSessionRequest, Session, SessionKind,
+    SessionResponse, TunneledSessionRequest, TunneledSessionResponse,
 };
 
 use crate::{
@@ -147,4 +151,32 @@ pub async fn upsert_tunneled(
     };
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+#[worker::send]
+pub async fn delete(
+    State(state): State<WorkerState>,
+    Path(session_name): Path<String>,
+    Json(request): Json<DeleteSessionRequest>,
+) -> impl IntoResponse {
+    match state
+        .sessions
+        .delete(&session_name, &request.session_token)
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(SessionRegistryError::SessionNotFound) => {
+            HttpError::new("Session not found".to_string(), StatusCode::NOT_FOUND).into_response()
+        }
+        Err(SessionRegistryError::SessionTokenMismatch) => HttpError::new(
+            "Session token does not match".to_string(),
+            StatusCode::CONFLICT,
+        )
+        .into_response(),
+        Err(error) => HttpError::new(
+            format!("Failed to delete session: {error}"),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+        .into_response(),
+    }
 }

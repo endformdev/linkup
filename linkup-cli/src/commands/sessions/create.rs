@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(clap::Args)]
 pub struct Args {
-    #[arg(long, help = "Request a specific session name")]
+    #[arg(long, value_name = "NAME", help = "Request a specific session name")]
     name: Option<String>,
 
     #[arg(
@@ -61,7 +61,7 @@ pub async fn run(args: &Args, config_arg: Option<&Path>, machine_id: MachineId) 
     let state = state::load()?;
 
     println!();
-    print_sessions_table(&[row], state.default_session.as_deref());
+    print_sessions_table(&[row], state.main_session.as_deref());
 
     Ok(())
 }

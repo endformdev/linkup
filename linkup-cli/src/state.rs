@@ -161,14 +161,14 @@ domains:
             url::Url::parse("https://remote-linkup.example.com").unwrap(),
             "token".to_string(),
         );
-        state.default_session = Some("main".to_string());
+        state.main_session = Some("main".to_string());
         state.sessions.insert("main".to_string(), first);
         state.sessions.insert("agent".to_string(), second);
 
         let yaml = serde_yaml::to_string(&state).unwrap();
         let decoded: State = serde_yaml::from_str(&yaml).unwrap();
 
-        assert_eq!(decoded.default_session.as_deref(), Some("main"));
+        assert_eq!(decoded.main_session.as_deref(), Some("main"));
         assert_eq!(decoded.sessions.len(), 2);
     }
 }
