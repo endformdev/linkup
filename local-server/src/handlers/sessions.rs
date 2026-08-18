@@ -7,15 +7,15 @@ use axum::{
 };
 use http::StatusCode;
 use linkup::{
-    LocalTunneledSessionRequest, PreviewSessionRequest, Session, SessionDetailResponse,
-    SessionKind, SessionsListResponse, TunneledSessionRequest,
+    LocalTunneledSessionRequest, PreviewSessionRequest, SessionDetailResponse,
+    SessionsListResponse, TunneledSessionRequest,
 };
 use linkup_clients::WorkerClientError;
 
 use crate::{ServerState, handlers::ApiError};
 
 pub async fn list_sessions(State(server_state): State<ServerState>) -> impl IntoResponse {
-    match server_state.session_allocator.list_sessions().await {
+    match server_state.state_store.list_sessions() {
         Ok(sessions) => Json(SessionsListResponse {
             sessions: HashMap::from_iter(sessions),
         })
@@ -32,11 +32,7 @@ pub async fn get_session(
     State(server_state): State<ServerState>,
     Path(session_name): Path<String>,
 ) -> impl IntoResponse {
-    match server_state
-        .session_allocator
-        .find_session(&session_name)
-        .await
-    {
+    match server_state.state_store.find_session(&session_name) {
         Ok(Some(session)) => Json(SessionDetailResponse {
             session_kind: session.kind,
             session_name,
@@ -101,75 +97,40 @@ pub async fn upsert_tunneled(
         },
     };
 
-    let session = match Session::new(
-        SessionKind::Tunneled,
-        request.session.token.clone(),
-        (&request.session).into(),
-    ) {
-        Ok(conf) => conf,
-        Err(e) => {
+    let tunnel_url = match tunneled_session.tunnel_data.url.parse() {
+        Ok(url) => url,
+        Err(error) => {
             return ApiError::new(
-                format!("Failed to parse server config: {} - local server", e),
-                StatusCode::BAD_REQUEST,
+                format!("Worker returned an invalid tunnel URL: {error}"),
+                StatusCode::INTERNAL_SERVER_ERROR,
             )
             .into_response();
         }
     };
 
-    let local_session_result = server_state
-        .session_allocator
-        .strict_store_session(&tunneled_session.session_name, &session)
-        .await;
-
-    if let Err(error) = local_session_result {
-        return ApiError::new(
-            format!("Failed to store server config: {}", error),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-        .into_response();
-    }
-
-    let domains = session
-        .domains
-        .iter()
-        .map(|domain| domain.domain.clone())
-        .collect::<Vec<String>>();
-
-    for domain in &domains {
-        let full_domain = format!(
-            "{session_name}.{domain}",
-            session_name = tunneled_session.session_name
-        );
-
-        server_state.dns_catalog.register_record(&full_domain).await;
-    }
-
-    if let Some(state_store) = &server_state.state_store {
-        let tunnel_url = match tunneled_session.tunnel_data.url.parse() {
-            Ok(url) => url,
-            Err(error) => {
-                return ApiError::new(
-                    format!("Worker returned an invalid tunnel URL: {error}"),
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                )
-                .into_response();
-            }
-        };
-
-        if let Err(error) = state_store
-            .upsert_session(
-                tunneled_session.session_name.clone(),
-                request.session,
-                tunnel_url,
-            )
-            .await
-        {
+    let session = match server_state.state_store.upsert_session(
+        tunneled_session.session_name.clone(),
+        request.session,
+        tunnel_url,
+    ) {
+        Ok(session) => session,
+        Err(error) => {
             return ApiError::new(
-                format!("Failed to persist local state: {error}"),
+                format!("Failed to store local session: {error}"),
                 StatusCode::INTERNAL_SERVER_ERROR,
             )
             .into_response();
         }
+    };
+
+    for domain in &session.domains {
+        let full_domain = format!(
+            "{session_name}.{domain}",
+            session_name = tunneled_session.session_name,
+            domain = domain.domain,
+        );
+
+        server_state.dns_catalog.register_record(&full_domain).await;
     }
 
     (StatusCode::OK, Json(tunneled_session)).into_response()
@@ -179,11 +140,7 @@ pub async fn delete_session(
     State(server_state): State<ServerState>,
     Path(session_name): Path<String>,
 ) -> impl IntoResponse {
-    let session = match server_state
-        .session_allocator
-        .find_session(&session_name)
-        .await
-    {
+    let session = match server_state.state_store.delete_session(&session_name) {
         Ok(None) => {
             return ApiError::new(
                 format!("Session '{}' not found", session_name),
@@ -201,18 +158,6 @@ pub async fn delete_session(
         Ok(Some(session)) => session,
     };
 
-    if let Err(error) = server_state
-        .session_allocator
-        .delete_session(&session_name)
-        .await
-    {
-        return ApiError::new(
-            format!("Failed to delete session: {}", error),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-        .into_response();
-    }
-
     for domain in &session.domains {
         let full_domain = format!("{session_name}.{domain}", domain = domain.domain);
 
@@ -220,16 +165,6 @@ pub async fn delete_session(
             .dns_catalog
             .deregister_record(&full_domain)
             .await;
-    }
-
-    if let Some(state_store) = &server_state.state_store
-        && let Err(error) = state_store.delete_session(&session_name).await
-    {
-        return ApiError::new(
-            format!("Failed to persist local state: {error}"),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-        .into_response();
     }
 
     StatusCode::NO_CONTENT.into_response()

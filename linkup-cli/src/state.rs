@@ -1,86 +1,49 @@
 use std::{
     collections::HashSet,
     fs,
-    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
 
 use anyhow::Context;
-use linkup::{
-    LOCAL_STATE_VERSION, LocalService, LocalState, ServiceTarget, SessionState, config::Config,
-};
+use linkup::{LocalService, ServiceTarget, SessionState, config::Config};
+use linkup_local_server::StateStore;
 use rand::distr::{Alphanumeric, SampleString};
-use serde::Serialize;
 
 use crate::{LINKUP_STATE_FILE, Result, config::load_config_with_override, linkup_file_path};
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(transparent)]
-pub struct State(LocalState);
+pub use linkup::State;
 
-impl State {
-    pub fn load() -> Result<Self> {
-        Self::load_from_path(&state_file_path())
-    }
-
-    pub fn load_from_path(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read state file on {path:?}"))?;
-        let state: LocalState =
-            serde_yaml::from_str(&content).context("Failed to parse state file")?;
-
-        if state.version != LOCAL_STATE_VERSION {
-            anyhow::bail!(
-                "Unsupported local state version {} (expected {})",
-                state.version,
-                LOCAL_STATE_VERSION
-            );
-        }
-
-        Ok(Self(state))
-    }
-
-    pub fn from_config(config_path: Option<&Path>) -> Result<(Self, SessionState)> {
-        let (config, config_path) = load_config_with_override(config_path)?;
-        let state = LocalState::new(
-            config.linkup.worker_url.clone(),
-            config.linkup.worker_token.clone(),
-        );
-        let session = session_from_config(config, &config_path);
-
-        Ok((Self(state), session))
-    }
-
-    pub fn save(&self) -> Result<()> {
-        self.save_to_path(&state_file_path())
-    }
-
-    pub fn save_to_path(&self, path: &Path) -> Result<()> {
-        let yaml = serde_yaml::to_string(&self.0)
-            .context("Failed to serialize the local state into YAML")?;
-
-        fs::write(path, yaml).with_context(|| format!("Failed to write state file to {path:?}"))
-    }
+pub fn load() -> Result<State> {
+    load_from_path(&state_file_path())
 }
 
-impl From<LocalState> for State {
-    fn from(state: LocalState) -> Self {
-        Self(state)
-    }
+pub fn load_from_path(path: &Path) -> Result<State> {
+    StateStore::load(path.to_path_buf())
+        .with_context(|| format!("Failed to load state file from {path:?}"))?
+        .state()
+        .context("Failed to read local state")
 }
 
-impl Deref for State {
-    type Target = LocalState;
+pub fn from_config(config_path: Option<&Path>) -> Result<(State, SessionState)> {
+    let (config, config_path) = load_config_with_override(config_path)?;
+    let state = State::new(
+        config.linkup.worker_url.clone(),
+        config.linkup.worker_token.clone(),
+    );
+    let session = session_from_config(config, &config_path);
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+    Ok((state, session))
 }
 
-impl DerefMut for State {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+pub fn save(state: &State) -> Result<()> {
+    save_to_path(state, &state_file_path())
+}
+
+pub fn save_to_path(state: &State, path: &Path) -> Result<()> {
+    StateStore::create(path.to_path_buf(), state.clone())
+        .with_context(|| format!("Failed to write state file to {path:?}"))?;
+
+    Ok(())
 }
 
 pub fn session_from_config(config: Config, config_path: &Path) -> SessionState {
@@ -194,16 +157,16 @@ domains:
         let config: Config = serde_yaml::from_str(CONFIG).unwrap();
         let first = session_from_config(config.clone(), Path::new("/first/linkup.yml"));
         let second = session_from_config(config, Path::new("/second/linkup.yml"));
-        let mut state = State::from(LocalState::new(
+        let mut state = State::new(
             url::Url::parse("https://remote-linkup.example.com").unwrap(),
             "token".to_string(),
-        ));
+        );
         state.default_session = Some("main".to_string());
         state.sessions.insert("main".to_string(), first);
         state.sessions.insert("agent".to_string(), second);
 
-        let yaml = serde_yaml::to_string(&state.0).unwrap();
-        let decoded: LocalState = serde_yaml::from_str(&yaml).unwrap();
+        let yaml = serde_yaml::to_string(&state).unwrap();
+        let decoded: State = serde_yaml::from_str(&yaml).unwrap();
 
         assert_eq!(decoded.default_session.as_deref(), Some("main"));
         assert_eq!(decoded.sessions.len(), 2);

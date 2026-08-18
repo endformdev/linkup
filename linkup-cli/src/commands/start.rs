@@ -18,7 +18,7 @@ use crate::{
 pub struct Args {}
 
 pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineId) -> Result<()> {
-    if State::load().is_ok() && local_server::is_reachable().await {
+    if state::load().is_ok() && local_server::is_reachable().await {
         println!("Linkup is already running. Run 'linkup stop' first to restart.",);
 
         return Ok(());
@@ -38,7 +38,7 @@ pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineI
         tunnel_data.get_or_insert(response.tunnel_data);
     }
 
-    let state = State::load()?;
+    let state = state::load()?;
     restore_linkup_env(&state);
     log::info!("Finished setting up!");
 
@@ -80,7 +80,7 @@ pub(crate) fn set_session_env(session: &SessionState) -> Result<()> {
 fn load_state_and_sessions(
     config_arg: Option<&Path>,
 ) -> Result<(State, Vec<(Option<String>, SessionState)>)> {
-    if let Ok(state) = State::load()
+    if let Ok(state) = state::load()
         && !state.sessions.is_empty()
     {
         let sessions = state
@@ -92,8 +92,8 @@ fn load_state_and_sessions(
         return Ok((state, sessions));
     }
 
-    let (state, session) = State::from_config(config_arg)?;
-    state.save()?;
+    let (state, session) = state::from_config(config_arg)?;
+    state::save(&state)?;
 
     Ok((state, vec![(None, session)]))
 }

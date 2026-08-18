@@ -10,7 +10,6 @@ use axum::{
     routing::{any, get, post},
 };
 use axum_server::tls_rustls::RustlsConfig;
-use linkup::{MemoryStringStore, SessionAllocator};
 use linkup_clients::WorkerClient;
 use rustls::ServerConfig;
 use std::{net::SocketAddr, path::PathBuf};
@@ -18,12 +17,11 @@ use std::{path::Path, sync::Arc};
 use tokio::{net::UdpSocket, select, signal};
 use tower::ServiceBuilder;
 use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use url::Url;
 
 use crate::dns::DnsCatalog;
 
 pub use linkup_clients::{HttpsClient, https_client};
-pub use state_store::StateStore;
+pub use state_store::{StateStore, StateStoreError};
 
 type AxumHttpsClient = HttpsClient<axum::body::Body>;
 
@@ -32,8 +30,7 @@ pub struct ServerState {
     pub dns_catalog: DnsCatalog,
     pub https_certs_dir: PathBuf,
     pub https_client: AxumHttpsClient,
-    pub session_allocator: SessionAllocator<MemoryStringStore>,
-    pub state_store: Option<StateStore>,
+    pub state_store: StateStore,
     pub worker_client: WorkerClient,
 }
 
@@ -67,17 +64,11 @@ pub fn router(server_state: ServerState) -> Router {
         )
 }
 
-pub async fn start(
-    string_store: MemoryStringStore,
-    certs_dir: &Path,
-    worker_url: &Url,
-    worker_token: &str,
-    state_store: Option<StateStore>,
-) {
-    let worker_client = WorkerClient::new(worker_url, worker_token);
+pub async fn start(certs_dir: &Path, state_store: StateStore) -> Result<(), StateStoreError> {
+    let state = state_store.state()?;
+    let worker_client = WorkerClient::new(&state.worker_url, &state.worker_token);
 
     let server_state = ServerState {
-        session_allocator: SessionAllocator::new(string_store),
         https_client: https_client(),
         dns_catalog: dns::DnsCatalog::new(),
         https_certs_dir: PathBuf::from(certs_dir),
@@ -99,6 +90,8 @@ pub async fn start(
             println!("Shutdown signal received, stopping all servers");
         }
     }
+
+    Ok(())
 }
 
 async fn start_server_https(server_state: ServerState) {

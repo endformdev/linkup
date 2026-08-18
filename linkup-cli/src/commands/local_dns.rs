@@ -51,7 +51,7 @@ pub async fn install(config_arg: Option<&Path>) -> Result<()> {
 
     ensure_resolver_dir()?;
 
-    let domains = managed_domains(State::load().ok().as_ref(), config_arg);
+    let domains = managed_domains(state::load().ok().as_ref(), config_arg);
 
     install_resolvers(&top_level_domains(&domains))?;
 
@@ -78,7 +78,7 @@ pub async fn uninstall(config_arg: Option<&Path>) -> Result<()> {
     commands::stop(&commands::StopArgs {}, false)?;
 
     let managed_top_level_domains = state::top_level_domains(&state::managed_domains(
-        State::load().ok().as_ref(),
+        state::load().ok().as_ref(),
         config_arg,
     ));
 

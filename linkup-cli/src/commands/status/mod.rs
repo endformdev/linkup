@@ -18,7 +18,7 @@ use crate::{
     config::load_config,
     services::{self, local_server},
     session::{SessionRow, list_session_rows, print_sessions_table},
-    state::State,
+    state,
 };
 
 pub use health::{ServerStatus, server_status};
@@ -47,7 +47,7 @@ pub async fn status(args: &Args) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let state = State::load().context("Failed to load local state")?;
+    let state = state::load().context("Failed to load local state")?;
 
     let target_session = args
         .session

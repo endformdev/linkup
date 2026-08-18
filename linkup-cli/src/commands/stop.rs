@@ -4,14 +4,14 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 
 use crate::env_files::clear_env_file;
-use crate::state::State;
+use crate::state;
 use crate::{Result, services};
 
 #[derive(clap::Args)]
 pub struct Args {}
 
 pub fn stop(_args: &Args, clear_env: bool) -> Result<()> {
-    match (State::load(), clear_env) {
+    match (state::load(), clear_env) {
         (Ok(state), true) => {
             // Reset env vars back to what they were before
             for session in state.sessions.values() {

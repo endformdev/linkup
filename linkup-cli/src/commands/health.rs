@@ -15,7 +15,7 @@ use url::Url;
 
 use crate::{
     services::{cloudflared, local_server},
-    state::State,
+    state::{self, State},
 };
 
 use super::{
@@ -144,7 +144,7 @@ impl States {
     fn load() -> Result<Self> {
         let mut items = BTreeMap::new();
 
-        if let Ok(state) = State::load() {
+        if let Ok(state) = state::load() {
             items.insert("state".to_string(), state);
         }
 
@@ -196,7 +196,7 @@ impl LinkupService {
 
 impl LinkupServices {
     fn load() -> Result<Self> {
-        let state = State::load().ok();
+        let state = state::load().ok();
 
         let remote_server_url = state
             .as_ref()

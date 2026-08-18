@@ -9,7 +9,7 @@ use crate::{
     config::load_config_with_override,
     services::local_server,
     session::{SessionRow, print_sessions_table},
-    state::{State, session_from_config},
+    state::{self, State, session_from_config},
 };
 
 #[derive(clap::Args)]
@@ -34,7 +34,7 @@ pub async fn run(args: &Args, config_arg: Option<&Path>, machine_id: MachineId) 
         bail!("Linkup is not running. Run 'linkup start' before creating another session.");
     }
 
-    let state = State::load()?;
+    let state = state::load()?;
     let (config, config_path) = load_config_with_override(config_arg)?;
 
     if config.linkup.worker_url != state.worker_url {
@@ -58,7 +58,7 @@ pub async fn run(args: &Args, config_arg: Option<&Path>, machine_id: MachineId) 
     set_session_env(&session)?;
 
     let row = SessionRow::from_session(&response.session_name, &session, SessionKind::Tunneled);
-    let state = State::load()?;
+    let state = state::load()?;
 
     println!();
     print_sessions_table(&[row], state.default_session.as_deref());

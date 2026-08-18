@@ -3,11 +3,11 @@
 use std::{path::PathBuf, process::Command};
 
 use linkup::{
-    Domain, MachineId, MemoryStringStore, Session, SessionAllocator, SessionDefinition,
-    SessionKind, SessionService, TunneledSessionRequest,
+    Domain, LocalService, MachineId, ServiceTarget, SessionDefinition, SessionService,
+    SessionState, State, TunneledSessionRequest, config::ServiceConfig,
 };
 use linkup_clients::WorkerClient;
-use linkup_local_server::{ServerState, dns::DnsCatalog, router};
+use linkup_local_server::{ServerState, StateStore, dns::DnsCatalog, router};
 use reqwest::Url;
 use tokio::net::TcpListener;
 
@@ -17,22 +17,19 @@ pub enum ServerKind {
     Worker,
 }
 
-pub async fn setup_server(
-    kind: ServerKind,
-) -> (String, Option<SessionAllocator<MemoryStringStore>>) {
+pub async fn setup_server(kind: ServerKind) -> (String, Option<StateStore>) {
     match kind {
         ServerKind::Local => {
-            let session_allocator = SessionAllocator::new(MemoryStringStore::default());
+            let worker_url = Url::parse("http://localhost").unwrap();
+            let state_store =
+                StateStore::in_memory(State::new(worker_url.clone(), "token123".to_string()))
+                    .unwrap();
             let state = ServerState {
-                session_allocator: session_allocator.clone(),
                 https_client: linkup_clients::https_client(),
                 dns_catalog: DnsCatalog::new(),
                 https_certs_dir: PathBuf::default(),
-                state_store: None,
-                worker_client: WorkerClient::new(
-                    &Url::parse("http://localhost").unwrap(),
-                    "token123",
-                ),
+                state_store: state_store.clone(),
+                worker_client: WorkerClient::new(&worker_url, "token123"),
             };
 
             let app = router(state);
@@ -44,7 +41,7 @@ pub async fn setup_server(
                 axum::serve(listener, app).await.unwrap();
             });
 
-            (format!("http://{}", addr), Some(session_allocator))
+            (format!("http://{}", addr), Some(state_store))
         }
         ServerKind::Worker => {
             if !check_worker_running() {
@@ -95,30 +92,35 @@ pub fn create_session_request(name: String, fe_location: Option<String>) -> Stri
     serde_json::to_string(&req).unwrap()
 }
 
-pub async fn seed_session(
-    allocator: &SessionAllocator<MemoryStringStore>,
-    name: &str,
-    fe_url: &str,
-) {
-    let definition = SessionDefinition {
+pub async fn seed_session(state_store: &StateStore, name: &str, fe_url: &str) {
+    let session = SessionState {
+        token: "token".to_string(),
+        config_path: "/tmp/linkup.yml".to_string(),
         domains: vec![Domain {
             domain: "example.com".to_string(),
             default_service: "frontend".to_string(),
             routes: None,
         }],
-        services: vec![SessionService {
-            name: "frontend".to_string(),
-            location: Url::parse(fe_url).unwrap(),
-            rewrites: None,
+        services: vec![LocalService {
+            current: ServiceTarget::Remote,
+            config: ServiceConfig {
+                name: "frontend".to_string(),
+                remote: Url::parse(fe_url).unwrap(),
+                local: Url::parse(fe_url).unwrap(),
+                directory: None,
+                rewrites: None,
+                health: None,
+            },
         }],
         cache_routes: None,
     };
 
-    let session = Session::new(SessionKind::Preview, "token".to_string(), definition).unwrap();
-
-    allocator
-        .strict_store_session(name, &session)
-        .await
+    state_store
+        .upsert_session(
+            name.to_string(),
+            session,
+            Url::parse("https://tunnel.example.com").unwrap(),
+        )
         .unwrap();
 }
 

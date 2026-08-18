@@ -7,12 +7,15 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{Domain, SessionDefinition, SessionService, config::ServiceConfig};
+use crate::{
+    ConfigError, Domain, Session, SessionDefinition, SessionKind, SessionService,
+    config::ServiceConfig,
+};
 
-pub const LOCAL_STATE_VERSION: u8 = 5;
+pub const STATE_VERSION: u8 = 5;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct LocalState {
+pub struct State {
     pub version: u8,
     pub worker_url: Url,
     pub worker_token: String,
@@ -21,10 +24,10 @@ pub struct LocalState {
     pub sessions: BTreeMap<String, SessionState>,
 }
 
-impl LocalState {
+impl State {
     pub fn new(worker_url: Url, worker_token: String) -> Self {
         Self {
-            version: LOCAL_STATE_VERSION,
+            version: STATE_VERSION,
             worker_url,
             worker_token,
             tunnel_url: None,
@@ -78,6 +81,14 @@ impl From<&SessionState> for SessionDefinition {
             domains: session.domains.clone(),
             cache_routes: session.cache_routes.clone(),
         }
+    }
+}
+
+impl TryFrom<&SessionState> for Session {
+    type Error = ConfigError;
+
+    fn try_from(session: &SessionState) -> Result<Self, Self::Error> {
+        Self::new(SessionKind::Tunneled, session.token.clone(), session.into())
     }
 }
 

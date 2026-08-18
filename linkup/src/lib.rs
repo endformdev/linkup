@@ -2,12 +2,12 @@ pub mod config;
 pub mod serde_ext;
 
 mod headers;
-mod local_state;
 mod machine;
 mod memory_session_store;
 mod name_gen;
 mod session;
 mod session_allocator;
+mod state;
 mod tunnel;
 mod versioning;
 
@@ -20,12 +20,12 @@ use thiserror::Error;
 
 pub use headers::normalize_cookie_header;
 pub use headers::{HeaderMap, HeaderName};
-pub use local_state::*;
 pub use machine::*;
 pub use memory_session_store::*;
 pub use name_gen::{random_animal, random_six_char};
 pub use session::*;
 pub use session_allocator::*;
+pub use state::*;
 pub use tunnel::*;
 pub use versioning::*;
 

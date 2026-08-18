@@ -3,7 +3,7 @@ use colored::Colorize;
 use linkup::{MachineId, ServiceTarget, SessionState};
 use url::Url;
 
-use crate::{Result, services, state::State};
+use crate::{Result, services, state};
 
 #[derive(clap::ValueEnum, Clone)]
 pub enum TargetArg {
@@ -46,7 +46,7 @@ pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
         TargetArg::Remote => ServiceTarget::Remote,
     };
 
-    let state = State::load()?;
+    let state = state::load()?;
     let session_name = args
         .session
         .clone()

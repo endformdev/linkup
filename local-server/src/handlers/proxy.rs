@@ -28,7 +28,7 @@ pub async fn handle_all(
         )
     };
 
-    let (session_name, config) = match server_state.session_allocator.get_request_session(&url, &headers).await {
+    let (session_name, config) = match server_state.state_store.get_request_session(&url, &headers) {
         Ok(session) => session,
         Err(_) => {
             return ApiError::new(

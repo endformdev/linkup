@@ -4,6 +4,26 @@ use crate::{
     random_six_char,
 };
 
+pub fn request_session_names(url: &str, headers: &HeaderMap) -> Vec<String> {
+    let mut names = vec![first_subdomain(url)];
+
+    for header in [
+        HeaderName::ForwardedHost,
+        HeaderName::Referer,
+        HeaderName::Origin,
+    ] {
+        if let Some(value) = headers.get(header) {
+            names.push(first_subdomain(value));
+        }
+    }
+
+    if let Some(tracestate) = headers.get(HeaderName::TraceState) {
+        names.push(extract_tracestate_session(tracestate));
+    }
+
+    names
+}
+
 #[derive(Clone)]
 pub struct SessionAllocator<S: StringStore> {
     store: S,
@@ -19,36 +39,9 @@ impl<S: StringStore> SessionAllocator<S> {
         url: &str,
         headers: &HeaderMap,
     ) -> Result<(String, Session), SessionError> {
-        let url_name = first_subdomain(url);
-        if let Some(config) = self.find_session(&url_name).await? {
-            return Ok((url_name, config));
-        }
-
-        if let Some(forwarded_host) = headers.get(HeaderName::ForwardedHost) {
-            let forwarded_host_name = first_subdomain(forwarded_host);
-            if let Some(config) = self.find_session(&forwarded_host_name).await? {
-                return Ok((forwarded_host_name, config));
-            }
-        }
-
-        if let Some(referer) = headers.get(HeaderName::Referer) {
-            let referer_name = first_subdomain(referer);
-            if let Some(config) = self.find_session(&referer_name).await? {
-                return Ok((referer_name, config));
-            }
-        }
-
-        if let Some(origin) = headers.get(HeaderName::Origin) {
-            let origin_name = first_subdomain(origin);
-            if let Some(config) = self.find_session(&origin_name).await? {
-                return Ok((origin_name, config));
-            }
-        }
-
-        if let Some(tracestate) = headers.get(HeaderName::TraceState) {
-            let trace_name = extract_tracestate_session(tracestate);
-            if let Some(config) = self.find_session(&trace_name).await? {
-                return Ok((trace_name, config));
+        for name in request_session_names(url, headers) {
+            if let Some(config) = self.find_session(&name).await? {
+                return Ok((name, config));
             }
         }
 
