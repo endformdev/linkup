@@ -32,11 +32,11 @@ pub struct Args {
 pub async fn run(args: &Args, config_arg: Option<&Path>) -> Result<()> {
     let (config, _) = load_config_with_override(config_arg)?;
 
-    let upsert_session_request =
-        linkup::create_preview_req_from_config(&config, args.name.clone(), &args.services);
+    let preview_session_request =
+        linkup::create_preview_request_from_config(&config, args.name.clone(), &args.services);
 
     if args.print_request {
-        let create_req_json = serde_json::to_string(&upsert_session_request)
+        let create_req_json = serde_json::to_string(&preview_session_request)
             .context("Failed to encode request to JSON string")?;
 
         println!("{}", create_req_json);
@@ -47,7 +47,7 @@ pub async fn run(args: &Args, config_arg: Option<&Path>) -> Result<()> {
     let worker_client = WorkerClient::new(&config.linkup.worker_url, &config.linkup.worker_token);
 
     let preview_session = worker_client
-        .preview_session(&upsert_session_request)
+        .preview_session(&preview_session_request)
         .await?;
 
     let preview_name = preview_session.session_name;

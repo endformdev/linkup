@@ -1,4 +1,6 @@
-use linkup::{SessionResponse, TunneledSessionResponse, UpsertSessionRequest};
+use linkup::{
+    PreviewSessionRequest, SessionResponse, TunneledSessionRequest, TunneledSessionResponse,
+};
 use reqwest::{StatusCode, header};
 use serde::{Serialize, de::DeserializeOwned};
 use url::Url;
@@ -48,14 +50,14 @@ impl WorkerClient {
 
     pub async fn tunneled_session(
         &self,
-        params: &UpsertSessionRequest,
+        params: &TunneledSessionRequest,
     ) -> Result<TunneledSessionResponse, Error> {
         self.post("/linkup/v2/sessions/tunneled", params).await
     }
 
     pub async fn preview_session(
         &self,
-        params: &UpsertSessionRequest,
+        params: &PreviewSessionRequest,
     ) -> Result<SessionResponse, Error> {
         self.post("/linkup/v2/sessions/preview", params).await
     }

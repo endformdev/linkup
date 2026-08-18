@@ -1,7 +1,7 @@
 use helpers::ServerKind;
 use linkup::{
-    Domain, NameKind, SessionResponse, SessionService, TunneledSessionResponse,
-    UpsertSessionRequest,
+    Domain, PreviewSessionRequest, SessionDefinition, SessionResponse, SessionService,
+    TunneledSessionResponse,
 };
 use reqwest::Url;
 
@@ -93,20 +93,21 @@ pub fn create_preview_request(fe_location: Option<String>) -> String {
         Some(location) => location,
         None => "http://example.com".to_string(),
     };
-    let req = UpsertSessionRequest::Unnamed {
-        name_kind: NameKind::SixChar,
-        session_token: None,
-        domains: vec![Domain {
-            domain: "example.com".to_string(),
-            default_service: "frontend".to_string(),
-            routes: None,
-        }],
-        services: vec![SessionService {
-            name: "frontend".to_string(),
-            location: Url::parse(&location).unwrap(),
-            rewrites: None,
-        }],
-        cache_routes: None,
+    let req = PreviewSessionRequest {
+        session_name: None,
+        definition: SessionDefinition {
+            domains: vec![Domain {
+                domain: "example.com".to_string(),
+                default_service: "frontend".to_string(),
+                routes: None,
+            }],
+            services: vec![SessionService {
+                name: "frontend".to_string(),
+                location: Url::parse(&location).unwrap(),
+                rewrites: None,
+            }],
+            cache_routes: None,
+        },
     };
     serde_json::to_string(&req).unwrap()
 }

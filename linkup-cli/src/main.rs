@@ -251,9 +251,10 @@ async fn main() {
         process::exit(1);
     }
 
-    match crate::machine::load_or_create() {
+    let machine_id = match crate::machine::load_or_create() {
         Ok(machine_id) => {
             log::debug!("Using machine ID {machine_id}");
+            machine_id
         }
         Err(error) => {
             error!("Failed to load or create Machine ID: {error}");
@@ -267,9 +268,9 @@ async fn main() {
     display_update_message(&cli.command).await;
 
     let result = match &cli.command {
-        Commands::Start(args) => commands::start(args, cli.config.as_deref()).await,
+        Commands::Start(args) => commands::start(args, cli.config.as_deref(), machine_id).await,
         Commands::Stop(args) => commands::stop(args, true),
-        Commands::Route(args) => commands::route(args).await,
+        Commands::Route(args) => commands::route(args, machine_id).await,
         Commands::Sessions(args) => commands::sessions(args, cli.config.as_deref()).await,
         Commands::Status(args) => commands::status(args).await,
         Commands::Health(args) => commands::health(args).await,

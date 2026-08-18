@@ -209,14 +209,13 @@ impl<S: StringStore> SessionAllocator<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MemoryStringStore, SessionKind, UpsertSessionRequest};
+    use crate::{MemoryStringStore, PREVIEW_SESSION_TOKEN, SessionDefinition, SessionKind};
 
     #[tokio::test]
     async fn identical_preview_requests_reuse_same_name() {
         let store = MemoryStringStore::default();
         let allocator = SessionAllocator::new(store);
         let request_json = serde_json::json!({
-            "name_kind": "six_char",
             "services": [
                 {
                     "name": "frontend",
@@ -243,9 +242,10 @@ mod tests {
         })
         .to_string();
 
-        let first_session = Session::from_upsert_req(
+        let first_session = Session::new(
             SessionKind::Preview,
-            serde_json::from_str::<UpsertSessionRequest>(&request_json).unwrap(),
+            PREVIEW_SESSION_TOKEN.to_string(),
+            serde_json::from_str::<SessionDefinition>(&request_json).unwrap(),
         )
         .unwrap();
 

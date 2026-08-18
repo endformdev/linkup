@@ -3,8 +3,8 @@
 use std::{path::PathBuf, process::Command};
 
 use linkup::{
-    Domain, MemoryStringStore, Session, SessionAllocator, SessionKind, SessionService,
-    UpsertSessionRequest,
+    Domain, MachineId, MemoryStringStore, Session, SessionAllocator, SessionDefinition,
+    SessionKind, SessionService, TunneledSessionRequest,
 };
 use linkup_clients::WorkerClient;
 use linkup_local_server::{ServerState, dns::DnsCatalog, router};
@@ -73,20 +73,23 @@ pub fn create_session_request(name: String, fe_location: Option<String>) -> Stri
         Some(location) => location,
         None => "http://example.com".to_string(),
     };
-    let req = UpsertSessionRequest::Named {
-        desired_name: name,
+    let req = TunneledSessionRequest {
+        machine_id: MachineId::generate(),
+        session_name: Some(name),
         session_token: "token".to_string(),
-        domains: vec![Domain {
-            domain: "example.com".to_string(),
-            default_service: "frontend".to_string(),
-            routes: None,
-        }],
-        services: vec![SessionService {
-            name: "frontend".to_string(),
-            location: Url::parse(&location).unwrap(),
-            rewrites: None,
-        }],
-        cache_routes: None,
+        definition: SessionDefinition {
+            domains: vec![Domain {
+                domain: "example.com".to_string(),
+                default_service: "frontend".to_string(),
+                routes: None,
+            }],
+            services: vec![SessionService {
+                name: "frontend".to_string(),
+                location: Url::parse(&location).unwrap(),
+                rewrites: None,
+            }],
+            cache_routes: None,
+        },
     };
     serde_json::to_string(&req).unwrap()
 }
@@ -96,9 +99,7 @@ pub async fn seed_session(
     name: &str,
     fe_url: &str,
 ) {
-    let req = UpsertSessionRequest::Named {
-        desired_name: name.to_string(),
-        session_token: "token".to_string(),
+    let definition = SessionDefinition {
         domains: vec![Domain {
             domain: "example.com".to_string(),
             default_service: "frontend".to_string(),
@@ -112,7 +113,7 @@ pub async fn seed_session(
         cache_routes: None,
     };
 
-    let session = Session::from_upsert_req(SessionKind::Preview, req).unwrap();
+    let session = Session::new(SessionKind::Preview, "token".to_string(), definition).unwrap();
 
     allocator
         .strict_store_session(name, &session)

@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, anyhow};
+use linkup::MachineId;
 
 use crate::{
     Result,
@@ -16,7 +17,7 @@ use crate::{
 #[derive(clap::Args)]
 pub struct Args {}
 
-pub async fn start(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
+pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineId) -> Result<()> {
     if State::load().is_ok() && local_server::is_reachable().await {
         println!("Linkup is already running. Run 'linkup stop' first to restart.",);
 
@@ -32,7 +33,7 @@ pub async fn start(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
 
     services::local_server::start().await?;
 
-    let tunnel_data = match services::local_server::update_state(&mut state).await {
+    let tunnel_data = match services::local_server::update_state(&mut state, machine_id).await {
         Ok(tunnel_data) => {
             log::info!("Finished setting up!");
             tunnel_data

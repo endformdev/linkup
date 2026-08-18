@@ -7,8 +7,8 @@ use axum::{
 };
 use http::StatusCode;
 use linkup::{
-    NameKind, Session, SessionDetailResponse, SessionKind, SessionsListResponse,
-    UpsertSessionRequest,
+    NameKind, PreviewSessionRequest, Session, SessionDetailResponse, SessionKind,
+    SessionsListResponse, TunneledSessionRequest,
 };
 use linkup_clients::WorkerClientError;
 
@@ -59,13 +59,9 @@ pub async fn get_session(
 
 pub async fn upsert_preview(
     State(server_state): State<ServerState>,
-    Json(upsert_req): Json<UpsertSessionRequest>,
+    Json(request): Json<PreviewSessionRequest>,
 ) -> impl IntoResponse {
-    match server_state
-        .worker_client
-        .preview_session(&upsert_req)
-        .await
-    {
+    match server_state.worker_client.preview_session(&request).await {
         Ok(session_response) => Json(session_response).into_response(),
         Err(error) => match error {
             WorkerClientError::Response(status_code, message) => {
@@ -82,13 +78,9 @@ pub async fn upsert_preview(
 
 pub async fn upsert_tunneled(
     State(server_state): State<ServerState>,
-    Json(upsert_req): Json<UpsertSessionRequest>,
+    Json(request): Json<TunneledSessionRequest>,
 ) -> impl IntoResponse {
-    let tunneled_session = match server_state
-        .worker_client
-        .tunneled_session(&upsert_req)
-        .await
-    {
+    let tunneled_session = match server_state.worker_client.tunneled_session(&request).await {
         Ok(tunneled_session) => tunneled_session,
         Err(error) => match error {
             WorkerClientError::Response(StatusCode::CONFLICT, _) => {
@@ -104,7 +96,11 @@ pub async fn upsert_tunneled(
         },
     };
 
-    let session: Session = match Session::from_upsert_req(SessionKind::Tunneled, upsert_req) {
+    let session = match Session::new(
+        SessionKind::Tunneled,
+        request.session_token,
+        request.definition,
+    ) {
         Ok(conf) => conf,
         Err(e) => {
             return ApiError::new(

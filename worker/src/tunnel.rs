@@ -113,10 +113,13 @@ pub async fn delete_tunnel(
     Ok(())
 }
 
-pub async fn upsert_tunnel(state: &WorkerState, session_name: &str) -> Result<TunnelData, String> {
+pub async fn upsert_tunnel(
+    state: &WorkerState,
+    machine_id: &linkup::MachineId,
+) -> Result<TunnelData, String> {
     let kv = &state.tunnels_kv;
 
-    let tunnel_name = format!("{}{}", state.tunnel_prefix, session_name);
+    let tunnel_name = format!("{}{}", &state.tunnel_prefix, machine_id);
     let tunnel_data: Option<TunnelData> = kv
         .get(&tunnel_name)
         .json()

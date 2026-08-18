@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use colored::Colorize;
+use linkup::MachineId;
 use url::Url;
 
 use crate::{
@@ -29,7 +30,7 @@ pub struct Args {
     all: bool,
 }
 
-pub async fn route(args: &Args) -> Result<()> {
+pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
     if !services::local_server::is_reachable().await {
         println!(
             "{}",
@@ -50,7 +51,7 @@ pub async fn route(args: &Args) -> Result<()> {
     let target_map =
         set_service_targets(&mut state, &args.service_names, args.all, service_target)?;
 
-    services::local_server::update_state(&mut state).await?;
+    services::local_server::update_state(&mut state, machine_id).await?;
 
     let name_width = target_map
         .iter()

@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{NameKind, TunnelData, config::Config};
+use crate::{MachineId, TunnelData, config::Config};
 
 pub const PREVIEW_SESSION_TOKEN: &str = "preview_session";
 
@@ -36,33 +36,29 @@ pub struct Route {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum UpsertSessionRequest {
-    Named {
-        desired_name: String,
-        session_token: String,
-        services: Vec<SessionService>,
-        domains: Vec<Domain>,
-        #[serde(
-            default,
-            serialize_with = "crate::serde_ext::serialize_opt_vec_regex",
-            deserialize_with = "crate::serde_ext::deserialize_opt_vec_regex"
-        )]
-        cache_routes: Option<Vec<Regex>>,
-    },
-    Unnamed {
-        #[serde(default)]
-        name_kind: NameKind,
-        session_token: Option<String>,
-        services: Vec<SessionService>,
-        domains: Vec<Domain>,
-        #[serde(
-            default,
-            serialize_with = "crate::serde_ext::serialize_opt_vec_regex",
-            deserialize_with = "crate::serde_ext::deserialize_opt_vec_regex"
-        )]
-        cache_routes: Option<Vec<Regex>>,
-    },
+pub struct SessionDefinition {
+    pub services: Vec<SessionService>,
+    pub domains: Vec<Domain>,
+    #[serde(
+        default,
+        serialize_with = "crate::serde_ext::serialize_opt_vec_regex",
+        deserialize_with = "crate::serde_ext::deserialize_opt_vec_regex"
+    )]
+    pub cache_routes: Option<Vec<Regex>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PreviewSessionRequest {
+    pub session_name: Option<String>,
+    pub definition: SessionDefinition,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TunneledSessionRequest {
+    pub machine_id: MachineId,
+    pub session_name: Option<String>,
+    pub session_token: String,
+    pub definition: SessionDefinition,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -164,50 +160,17 @@ impl Session {
     pub fn new(
         kind: SessionKind,
         session_token: String,
-        services: Vec<SessionService>,
-        domains: Vec<Domain>,
-        cache_routes: Option<Vec<Regex>>,
+        definition: SessionDefinition,
     ) -> Result<Self, ConfigError> {
         let session = Self {
             kind,
             session_token,
-            services,
-            domains,
-            cache_routes,
+            services: definition.services,
+            domains: definition.domains,
+            cache_routes: definition.cache_routes,
         };
 
         session.validate()?;
-
-        Ok(session)
-    }
-
-    pub fn from_upsert_req(
-        kind: SessionKind,
-        req: UpsertSessionRequest,
-    ) -> Result<Self, ConfigError> {
-        let (session_token, services, domains, cache_routes) = match req {
-            UpsertSessionRequest::Named {
-                services,
-                domains,
-                cache_routes,
-                session_token,
-                ..
-            } => (session_token, services, domains, cache_routes),
-            UpsertSessionRequest::Unnamed {
-                services,
-                domains,
-                cache_routes,
-                session_token,
-                ..
-            } => (
-                session_token.unwrap_or_else(|| PREVIEW_SESSION_TOKEN.to_string()),
-                services,
-                domains,
-                cache_routes,
-            ),
-        };
-
-        let session = Self::new(kind, session_token, services, domains, cache_routes)?;
 
         Ok(session)
     }
@@ -302,11 +265,11 @@ impl TryFrom<serde_json::Value> for Session {
     }
 }
 
-pub fn create_preview_req_from_config(
+pub fn create_preview_request_from_config(
     config: &Config,
-    desired_name: Option<String>,
+    session_name: Option<String>,
     services_overwrite: &[(String, Url)],
-) -> UpsertSessionRequest {
+) -> PreviewSessionRequest {
     let mut session_services: Vec<SessionService> = Vec::with_capacity(config.services.len());
 
     for service in &config.services {
@@ -326,17 +289,9 @@ pub fn create_preview_req_from_config(
         });
     }
 
-    match desired_name {
-        Some(name) => UpsertSessionRequest::Named {
-            desired_name: name,
-            session_token: PREVIEW_SESSION_TOKEN.to_string(),
-            services: session_services,
-            domains: config.domains.clone(),
-            cache_routes: config.linkup.cache_routes.clone(),
-        },
-        None => UpsertSessionRequest::Unnamed {
-            name_kind: NameKind::SixChar,
-            session_token: None,
+    PreviewSessionRequest {
+        session_name,
+        definition: SessionDefinition {
             services: session_services,
             domains: config.domains.clone(),
             cache_routes: config.linkup.cache_routes.clone(),

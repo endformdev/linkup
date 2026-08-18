@@ -13,7 +13,8 @@ use tokio::time::sleep;
 use url::Url;
 
 use linkup::{
-    NameKind, Session, SessionKind, TunnelData, TunneledSessionResponse, UpsertSessionRequest,
+    MachineId, SessionDefinition, SessionKind, TunnelData, TunneledSessionRequest,
+    TunneledSessionResponse,
 };
 use linkup_clients::{LocalServerClient, LocalServerClientError};
 
@@ -87,9 +88,9 @@ pub async fn is_reachable() -> bool {
     )
 }
 
-pub async fn update_state(state: &mut State) -> Result<TunnelData> {
+pub async fn update_state(state: &mut State, machine_id: MachineId) -> Result<TunnelData> {
     log::info!("Uploading state to server...");
-    let tunneled_session = upload_tunneled_state(state).await?;
+    let tunneled_session = upload_tunneled_state(state, machine_id).await?;
 
     log::info!("Updating local state file...");
     state.linkup.session_name = tunneled_session.session_name;
@@ -101,43 +102,22 @@ pub async fn update_state(state: &mut State) -> Result<TunnelData> {
     Ok(tunneled_session.tunnel_data)
 }
 
-fn build_named_upsert_request(session_name: &str, state: &State) -> UpsertSessionRequest {
-    let session: Session = state.into();
-
-    UpsertSessionRequest::Named {
-        desired_name: session_name.to_string(),
-        session_token: session.session_token,
-        services: session.services,
-        domains: session.domains,
-        cache_routes: session.cache_routes,
-    }
-}
-
-async fn upload_tunneled_state(state: &State) -> Result<TunneledSessionResponse> {
+async fn upload_tunneled_state(
+    state: &State,
+    machine_id: MachineId,
+) -> Result<TunneledSessionResponse> {
     let local_server_client = LocalServerClient::new(&url());
-
-    let session: Session = state.into();
-
-    let desired_session_name =
+    let definition: SessionDefinition = state.into();
+    let session_name =
         (!state.linkup.session_name.is_empty()).then(|| state.linkup.session_name.clone());
-
-    let upsert_request = match desired_session_name {
-        Some(desired_name) => build_named_upsert_request(&desired_name, state),
-        None => {
-            let session_token =
-                (!session.session_token.is_empty()).then_some(session.session_token);
-
-            UpsertSessionRequest::Unnamed {
-                name_kind: NameKind::Animal,
-                session_token,
-                services: session.services.clone(),
-                domains: session.domains.clone(),
-                cache_routes: session.cache_routes.clone(),
-            }
-        }
+    let request = TunneledSessionRequest {
+        machine_id,
+        session_name,
+        session_token: state.linkup.session_token.clone(),
+        definition,
     };
 
-    let session_response = local_server_client.tunneled_session(&upsert_request).await;
+    let session_response = local_server_client.tunneled_session(&request).await;
 
     let session_response = match session_response {
         Ok(session_response) => session_response,
@@ -146,12 +126,11 @@ async fn upload_tunneled_state(state: &State) -> Result<TunneledSessionResponse>
                 "Requested name from state file already exists, attempting to create with a new name"
             );
 
-            let unnamed_request = UpsertSessionRequest::Unnamed {
-                name_kind: NameKind::Animal,
-                session_token: None,
-                services: session.services,
-                domains: session.domains,
-                cache_routes: session.cache_routes,
+            let unnamed_request = TunneledSessionRequest {
+                machine_id,
+                session_name: None,
+                session_token: request.session_token,
+                definition: request.definition,
             };
 
             local_server_client

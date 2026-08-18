@@ -9,8 +9,3 @@ pub struct TunnelData {
     pub secret: String,
     pub last_started: u64,
 }
-
-#[derive(Serialize)]
-pub struct GetTunnelRequest {
-    pub session_name: String,
-}

@@ -10,7 +10,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use linkup::{Domain, Session, SessionKind, SessionService};
+use linkup::{Domain, SessionDefinition, SessionKind, SessionService};
 
 use crate::{LINKUP_STATE_FILE, Result, config::load_config_with_override, linkup_file_path};
 
@@ -136,7 +136,7 @@ impl Display for ServiceTarget {
     }
 }
 
-impl From<&State> for Session {
+impl From<&State> for SessionDefinition {
     fn from(state: &State) -> Self {
         let session_services = state
             .services
@@ -152,9 +152,7 @@ impl From<&State> for Session {
             })
             .collect::<Vec<_>>();
 
-        Session {
-            kind: state.linkup.kind.clone(),
-            session_token: state.linkup.session_token.clone(),
+        SessionDefinition {
             services: session_services,
             domains: state.domains.clone(),
             cache_routes: state.linkup.cache_routes.clone(),

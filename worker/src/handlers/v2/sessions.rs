@@ -2,8 +2,8 @@ use axum::{Json, extract::State, response::IntoResponse};
 
 use http::StatusCode;
 use linkup::{
-    Session, SessionError, SessionKind, SessionResponse, TunneledSessionResponse,
-    UpsertSessionRequest,
+    NameKind, PREVIEW_SESSION_TOKEN, PreviewSessionRequest, Session, SessionError, SessionKind,
+    SessionResponse, TunneledSessionRequest, TunneledSessionResponse,
 };
 
 use crate::{http_error::HttpError, tunnel, worker_state::WorkerState};
@@ -11,9 +11,13 @@ use crate::{http_error::HttpError, tunnel, worker_state::WorkerState};
 #[worker::send]
 pub async fn upsert_preview(
     State(state): State<WorkerState>,
-    Json(req): Json<UpsertSessionRequest>,
+    Json(request): Json<PreviewSessionRequest>,
 ) -> impl IntoResponse {
-    let session: Session = match Session::from_upsert_req(SessionKind::Preview, req.clone()) {
+    let session = match Session::new(
+        SessionKind::Preview,
+        PREVIEW_SESSION_TOKEN.to_string(),
+        request.definition,
+    ) {
         Ok(conf) => conf,
         Err(e) => {
             return HttpError::new(
@@ -36,12 +40,12 @@ pub async fn upsert_preview(
         }
     }
 
-    let session_name = match &req {
-        UpsertSessionRequest::Named { desired_name, .. } => desired_name.clone(),
-        UpsertSessionRequest::Unnamed { name_kind, .. } => {
+    let session_name = match request.session_name {
+        Some(session_name) => session_name,
+        None => {
             let desired_name = state
                 .session_allocator
-                .new_session_name(name_kind, "", &session)
+                .new_session_name(&NameKind::SixChar, "", &session)
                 .await;
 
             match desired_name {
@@ -83,9 +87,13 @@ pub async fn upsert_preview(
 #[worker::send]
 pub async fn upsert_tunneled(
     State(state): State<WorkerState>,
-    Json(req): Json<UpsertSessionRequest>,
+    Json(request): Json<TunneledSessionRequest>,
 ) -> impl IntoResponse {
-    let mut session: Session = match Session::from_upsert_req(SessionKind::Tunneled, req.clone()) {
+    let mut session = match Session::new(
+        SessionKind::Tunneled,
+        request.session_token,
+        request.definition,
+    ) {
         Ok(conf) => conf,
         Err(e) => {
             return HttpError::new(
@@ -96,12 +104,12 @@ pub async fn upsert_tunneled(
         }
     };
 
-    let desired_name = match &req {
-        UpsertSessionRequest::Named { desired_name, .. } => desired_name.clone(),
-        UpsertSessionRequest::Unnamed { name_kind, .. } => {
+    let desired_name = match request.session_name {
+        Some(session_name) => session_name,
+        None => {
             let desired_name = state
                 .session_allocator
-                .new_session_name(name_kind, "", &session)
+                .new_session_name(&NameKind::Animal, "", &session)
                 .await;
 
             match desired_name {
@@ -117,7 +125,7 @@ pub async fn upsert_tunneled(
         }
     };
 
-    let tunnel_data = match tunnel::upsert_tunnel(&state, &desired_name).await {
+    let tunnel_data = match tunnel::upsert_tunnel(&state, &request.machine_id).await {
         Ok(data) => data,
         Err(e) => {
             return HttpError::new(
@@ -146,15 +154,15 @@ pub async fn upsert_tunneled(
     {
         match error {
             SessionError::SessionNameConflict => {
+                return HttpError::new("Conflict".to_string(), StatusCode::CONFLICT)
+                    .into_response();
+            }
+            _ => {
                 return HttpError::new(
                     format!("Failed to store server config: {}", error),
                     StatusCode::INTERNAL_SERVER_ERROR,
                 )
                 .into_response();
-            }
-            _ => {
-                return HttpError::new("Conflict".to_string(), StatusCode::CONFLICT)
-                    .into_response();
             }
         }
     }
