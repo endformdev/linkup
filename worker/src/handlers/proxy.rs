@@ -12,7 +12,7 @@ use crate::{http_error::HttpError, worker_state::WorkerState, ws::handle_ws_resp
 pub async fn handle_all(State(state): State<WorkerState>, mut req: Request) -> impl IntoResponse {
     let headers: linkup::HeaderMap = req.headers().into();
     let url = req.uri().to_string();
-    let (session_name, config) = match state.session_allocator.get_request_session(&url, &headers).await {
+    let (session_name, config) = match state.sessions.session_for_request(&url, &headers).await {
         Ok(session) => session,
         Err(_) => {
             return HttpError::new(

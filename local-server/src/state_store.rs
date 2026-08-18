@@ -5,8 +5,7 @@ use std::{
 };
 
 use linkup::{
-    ConfigError, HeaderMap, STATE_VERSION, Session, SessionError, SessionState, State,
-    request_session_names,
+    ConfigError, HeaderMap, STATE_VERSION, Session, SessionState, State, session_names_from_request,
 };
 use url::Url;
 
@@ -135,15 +134,13 @@ impl StateStore {
         url: &str,
         headers: &HeaderMap,
     ) -> Result<(String, Session), StateStoreError> {
-        for name in request_session_names(url, headers) {
+        for name in session_names_from_request(url, headers) {
             if let Some(session) = self.find_session(&name)? {
                 return Ok((name, session));
             }
         }
 
-        Err(StateStoreError::Session(SessionError::NoSuchSession(
-            url.to_string(),
-        )))
+        Err(StateStoreError::NoSessionForRequest(url.to_string()))
     }
 
     fn validate_version(state: &State) -> Result<(), StateStoreError> {
@@ -177,8 +174,8 @@ pub enum StateStoreError {
     LockPoisoned,
     #[error("Invalid session in local state: {0}")]
     Config(#[from] ConfigError),
-    #[error(transparent)]
-    Session(#[from] SessionError),
+    #[error("No session found for request {0}")]
+    NoSessionForRequest(String),
 }
 
 #[cfg(test)]

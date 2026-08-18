@@ -3,72 +3,25 @@ pub mod serde_ext;
 
 mod headers;
 mod machine;
-mod memory_session_store;
-mod name_gen;
+mod request_session;
 mod session;
-mod session_allocator;
 mod state;
 mod tunnel;
 mod versioning;
 
-use std::future::Future;
-
 use http::{HeaderMap as HttpHeaderMap, HeaderValue as HttpHeaderValue};
 use rand::RngExt;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 pub use headers::normalize_cookie_header;
 pub use headers::{HeaderMap, HeaderName};
 pub use machine::*;
-pub use memory_session_store::*;
-pub use name_gen::{random_animal, random_six_char};
+pub use request_session::*;
 pub use session::*;
-pub use session_allocator::*;
 pub use state::*;
 pub use tunnel::*;
 pub use versioning::*;
 
 use url::Url;
-
-#[derive(Error, Debug)]
-pub enum SessionError {
-    #[error("no session found for request {0}")]
-    NoSuchSession(String),
-    #[error("Could not list configs: {0}")]
-    ListError(String),
-    #[error("Could not get config: {0}")]
-    GetError(String),
-    #[error("Could not put config: {0}")]
-    PutError(String),
-    #[error("Could not delete config: {0}")]
-    DeleteError(String),
-    #[error("Invalid stored config: {0}")]
-    ConfigErr(String),
-    #[error("Session name is empty")]
-    EmptySessionName,
-    #[error("Session with name already exists")]
-    SessionNameConflict,
-}
-
-// Since this trait is theoretically public (even though, the idea is for it to be used by the other modules within
-// this workspace), we should return `impl Future` instead of having `async fn` so that we can add and ensure
-// any desired bounds.
-pub trait StringStore {
-    fn get(&self, key: &str) -> impl Future<Output = Result<Option<String>, SessionError>>;
-    fn exists(&self, key: &str) -> impl Future<Output = Result<bool, SessionError>>;
-    fn put(&self, key: &str, value: &str) -> impl Future<Output = Result<(), SessionError>>;
-    fn delete(&self, key: &str) -> impl Future<Output = Result<(), SessionError>>;
-    fn list(&self) -> impl Future<Output = Result<Vec<(String, String)>, SessionError>>;
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NameKind {
-    Animal,
-    #[default]
-    SixChar,
-}
 
 pub fn get_additional_headers(
     url: &str,
@@ -388,40 +341,40 @@ mod tests {
     }
     "#;
 
-    #[tokio::test]
-    async fn test_get_request_session_by_subdomain() {
-        let string_store = MemoryStringStore::default();
-        let sessions = SessionAllocator::new(string_store);
-
-        let config_value: serde_json::Value = serde_json::from_str(CONF_STR).unwrap();
-        let config: Session = config_value.try_into().unwrap();
-
-        let name = sessions
-            .store_session(&config, NameKind::Animal, "")
-            .await
-            .unwrap();
+    #[test]
+    fn test_session_names_from_request() {
+        let name = "tiny-cow";
+        let expected = name.to_string();
 
         // Normal subdomain
-        sessions
-            .get_request_session(&format!("{}.example.com", name), &HeaderMap::new())
-            .await
-            .unwrap();
+        assert!(
+            session_names_from_request(&format!("{}.example.com", name), &HeaderMap::new())
+                .any(|candidate| candidate == expected)
+        );
 
         // Referer
         let mut referer_headers = HeaderMap::new();
         referer_headers.insert("referer", format!("http://{}.example.com", name));
-        sessions
-            .get_request_session("example.com", &referer_headers)
-            .await
-            .unwrap();
+        assert!(
+            session_names_from_request("example.com", &referer_headers)
+                .any(|candidate| candidate == expected)
+        );
 
         // Origin
         let mut origin_headers = HeaderMap::new();
         origin_headers.insert("origin", format!("http://{}.example.com", name));
-        sessions
-            .get_request_session("example.com", &origin_headers)
-            .await
-            .unwrap();
+        assert!(
+            session_names_from_request("example.com", &origin_headers)
+                .any(|candidate| candidate == expected)
+        );
+
+        // Forwarded host
+        let mut forwarded_host_headers = HeaderMap::new();
+        forwarded_host_headers.insert(HeaderName::ForwardedHost, format!("{}.example.com", name));
+        assert!(
+            session_names_from_request("example.com", &forwarded_host_headers)
+                .any(|candidate| candidate == expected)
+        );
 
         // Trace state
         let mut trace_headers = HeaderMap::new();
@@ -429,17 +382,17 @@ mod tests {
             HeaderName::TraceState,
             format!("some-other=xyz,linkup-session={}", name),
         );
-        sessions
-            .get_request_session("example.com", &trace_headers)
-            .await
-            .unwrap();
+        assert!(
+            session_names_from_request("example.com", &trace_headers)
+                .any(|candidate| candidate == expected)
+        );
 
         let mut trace_headers_two = HeaderMap::new();
         trace_headers_two.insert(HeaderName::TraceState, format!("linkup-session={}", name));
-        sessions
-            .get_request_session("example.com", &trace_headers_two)
-            .await
-            .unwrap();
+        assert!(
+            session_names_from_request("example.com", &trace_headers_two)
+                .any(|candidate| candidate == expected)
+        );
     }
 
     #[test]
@@ -534,23 +487,11 @@ mod tests {
         assert_eq!(get_target_domain(url3, "tiny-cow"), "example.com");
     }
 
-    #[tokio::test]
-    async fn test_get_target_url() {
-        let string_store = MemoryStringStore::default();
-        let sessions = SessionAllocator::new(string_store);
-
+    #[test]
+    fn test_get_target_url() {
         let input_config_value: serde_json::Value = serde_json::from_str(CONF_STR).unwrap();
-        let input_config: Session = input_config_value.try_into().unwrap();
-
-        let name = sessions
-            .store_session(&input_config, NameKind::Animal, "")
-            .await
-            .unwrap();
-
-        let (name, config) = sessions
-            .get_request_session(&format!("{}.example.com", name), &HeaderMap::new())
-            .await
-            .unwrap();
+        let config: Session = input_config_value.try_into().unwrap();
+        let name = "tiny-cow".to_string();
 
         // Standard named subdomain
         assert_eq!(
@@ -624,23 +565,11 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_repeatable_rewritten_routes() {
-        let string_store = MemoryStringStore::default();
-        let sessions = SessionAllocator::new(string_store);
-
+    #[test]
+    fn test_repeatable_rewritten_routes() {
         let input_config_value: serde_json::Value = serde_json::from_str(CONF_STR).unwrap();
-        let input_config: Session = input_config_value.try_into().unwrap();
-
-        let name = sessions
-            .store_session(&input_config, NameKind::Animal, "")
-            .await
-            .unwrap();
-
-        let (name, config) = sessions
-            .get_request_session(&format!("{}.example.com", name), &HeaderMap::new())
-            .await
-            .unwrap();
+        let config: Session = input_config_value.try_into().unwrap();
+        let name = "tiny-cow".to_string();
 
         // Case is, target service on the remote side is a tunnel.
         // If the path gets rewritten once remotely, it can throw off finding
@@ -675,18 +604,11 @@ mod tests {
         assert_eq!(target.url, "http://localhost:8001/user");
     }
 
-    #[tokio::test]
-    async fn test_iframable() {
-        let string_store = MemoryStringStore::default();
-        let sessions = SessionAllocator::new(string_store);
-
+    #[test]
+    fn test_iframable() {
         let input_config_value: serde_json::Value = serde_json::from_str(CONF_STR).unwrap();
-        let input_config: Session = input_config_value.try_into().unwrap();
-
-        let name = sessions
-            .store_session(&input_config, NameKind::Animal, "")
-            .await
-            .unwrap();
+        let config: Session = input_config_value.try_into().unwrap();
+        let name = "tiny-cow".to_string();
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -694,9 +616,9 @@ mod tests {
             format!("https://{}.example.com/", name),
         );
 
-        let (session_name, config) = sessions
-            .get_request_session("http://other-example.com/", &headers)
-            .await
+        let session_name = session_names_from_request("http://other-example.com/", &headers)
+            .into_iter()
+            .find(|candidate| candidate == &name)
             .unwrap();
 
         assert_eq!(session_name, name);

@@ -2,11 +2,16 @@ use axum::{Json, extract::State, response::IntoResponse};
 
 use http::StatusCode;
 use linkup::{
-    NameKind, PREVIEW_SESSION_TOKEN, PreviewSessionRequest, Session, SessionError, SessionKind,
-    SessionResponse, TunneledSessionRequest, TunneledSessionResponse,
+    PREVIEW_SESSION_TOKEN, PreviewSessionRequest, Session, SessionKind, SessionResponse,
+    TunneledSessionRequest, TunneledSessionResponse,
 };
 
-use crate::{http_error::HttpError, tunnel, worker_state::WorkerState};
+use crate::{
+    http_error::HttpError,
+    session_registry::{SessionRegistryError, derive_preview_session_name},
+    tunnel,
+    worker_state::WorkerState,
+};
 
 #[worker::send]
 pub async fn upsert_preview(
@@ -42,32 +47,12 @@ pub async fn upsert_preview(
 
     let session_name = match request.session_name {
         Some(session_name) => session_name,
-        None => {
-            let desired_name = state
-                .session_allocator
-                .new_session_name(&NameKind::SixChar, "", &session)
-                .await;
-
-            match desired_name {
-                Ok(desired_name) => desired_name,
-                Err(error) => {
-                    return HttpError::new(
-                        format!("Failed generate new session name: {}", error),
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                    )
-                    .into_response();
-                }
-            }
-        }
+        None => derive_preview_session_name(&session),
     };
 
-    if let Err(error) = state
-        .session_allocator
-        .strict_store_session(&session_name, &session)
-        .await
-    {
+    if let Err(error) = state.sessions.upsert(&session_name, &session).await {
         match error {
-            SessionError::SessionNameConflict => {
+            SessionRegistryError::SessionNameConflict => {
                 return HttpError::new("Conflict".to_string(), StatusCode::CONFLICT)
                     .into_response();
             }
@@ -104,25 +89,18 @@ pub async fn upsert_tunneled(
         }
     };
 
-    let desired_name = match request.session_name {
+    let session_name = match request.session_name {
         Some(session_name) => session_name,
-        None => {
-            let desired_name = state
-                .session_allocator
-                .new_session_name(&NameKind::Animal, "", &session)
-                .await;
-
-            match desired_name {
-                Ok(desired_name) => desired_name,
-                Err(error) => {
-                    return HttpError::new(
-                        format!("Failed generate new session name: {}", error),
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                    )
-                    .into_response();
-                }
+        None => match state.sessions.find_available_tunneled_session_name().await {
+            Ok(generated_session_name) => generated_session_name,
+            Err(error) => {
+                return HttpError::new(
+                    format!("Failed generate new session name: {}", error),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .into_response();
             }
-        }
+        },
     };
 
     let tunnel_data = match tunnel::upsert_tunnel(&state, &request.machine_id).await {
@@ -147,13 +125,9 @@ pub async fn upsert_tunneled(
         }
     }
 
-    if let Err(error) = state
-        .session_allocator
-        .strict_store_session(&desired_name, &session)
-        .await
-    {
+    if let Err(error) = state.sessions.upsert(&session_name, &session).await {
         match error {
-            SessionError::SessionNameConflict => {
+            SessionRegistryError::SessionNameConflict => {
                 return HttpError::new("Conflict".to_string(), StatusCode::CONFLICT)
                     .into_response();
             }
@@ -168,7 +142,7 @@ pub async fn upsert_tunneled(
     }
 
     let response = TunneledSessionResponse {
-        session_name: desired_name,
+        session_name,
         tunnel_data,
     };
 

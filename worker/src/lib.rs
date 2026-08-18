@@ -7,8 +7,9 @@ use crate::{router::router, worker_state::WorkerState};
 
 mod handlers;
 mod http_error;
-mod kv_store;
+mod name_gen;
 mod router;
+mod session_registry;
 mod tunnel;
 mod worker_state;
 mod ws;

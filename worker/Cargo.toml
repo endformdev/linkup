@@ -14,9 +14,11 @@ futures = { workspace = true }
 http = { workspace = true }
 linkup = { workspace = true }
 regex = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true, features = ["default-tls"] }
+thiserror = { workspace = true }
 
 console_error_panic_hook = { version = "0.1.7" }
 getrandom = { version = "0.4.2", features = ["wasm_js"] }

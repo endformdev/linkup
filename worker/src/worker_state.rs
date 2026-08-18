@@ -1,7 +1,7 @@
-use linkup::{SessionAllocator, Version};
+use linkup::Version;
 use worker::{Env, kv::KvStore};
 
-use crate::kv_store::CfWorkerStringStore;
+use crate::session_registry::WorkerSessionRegistry;
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -17,7 +17,7 @@ pub struct CloudflareEnvironemnt {
 #[allow(dead_code)]
 pub struct WorkerState {
     pub min_supported_client_version: Version,
-    pub session_allocator: SessionAllocator<CfWorkerStringStore>,
+    pub sessions: WorkerSessionRegistry,
     pub tunnels_kv: KvStore,
     pub cloudflare: CloudflareEnvironemnt,
     pub env: Env,
@@ -43,11 +43,11 @@ impl WorkerState {
         let worker_token = env.var("WORKER_TOKEN")?;
         let tunnel_prefix = env.var("TUNNEL_NAME_PREFIX")?.to_string();
 
-        let session_allocator = SessionAllocator::new(CfWorkerStringStore::new(sessions_kv));
+        let sessions = WorkerSessionRegistry::new(sessions_kv);
 
         let state = WorkerState {
             min_supported_client_version,
-            session_allocator,
+            sessions,
             tunnels_kv,
             tunnel_prefix,
             cloudflare: CloudflareEnvironemnt {
