@@ -271,7 +271,9 @@ async fn main() {
         Commands::Start(args) => commands::start(args, cli.config.as_deref(), machine_id).await,
         Commands::Stop(args) => commands::stop(args, true),
         Commands::Route(args) => commands::route(args, machine_id).await,
-        Commands::Sessions(args) => commands::sessions(args, cli.config.as_deref()).await,
+        Commands::Sessions(args) => {
+            commands::sessions(args, cli.config.as_deref(), machine_id).await
+        }
         Commands::Status(args) => commands::status(args).await,
         Commands::Health(args) => commands::health(args).await,
         Commands::LocalDNS(args) => commands::local_dns(args, cli.config.as_deref()).await,
@@ -279,7 +281,7 @@ async fn main() {
         Commands::Uninstall(args) => commands::uninstall(args, cli.config.as_deref()).await,
         Commands::Completion(args) => commands::completion(args),
         Commands::Infra(args) => commands::infra(args).await,
-        Commands::Server(args) => commands::server(args, cli.config.as_deref()).await,
+        Commands::Server(args) => commands::server(args).await,
     };
 
     if let Err(error) = result {

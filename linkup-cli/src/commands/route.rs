@@ -1,12 +1,9 @@
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use colored::Colorize;
-use linkup::MachineId;
+use linkup::{MachineId, ServiceTarget, SessionState};
 use url::Url;
 
-use crate::{
-    Result, services,
-    state::{ServiceTarget, State},
-};
+use crate::{Result, services, state::State};
 
 #[derive(clap::ValueEnum, Clone)]
 pub enum TargetArg {
@@ -16,6 +13,9 @@ pub enum TargetArg {
 
 #[derive(clap::Args)]
 pub struct Args {
+    #[arg(long, value_name = "NAME", help = "Session to update")]
+    session: Option<String>,
+
     target: TargetArg,
 
     #[arg(required_unless_present = "all")]
@@ -46,12 +46,27 @@ pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
         TargetArg::Remote => ServiceTarget::Remote,
     };
 
-    let mut state = State::load()?;
+    let state = State::load()?;
+    let session_name = args
+        .session
+        .clone()
+        .or_else(|| state.default_session.clone())
+        .context("No default session is configured; specify one with --session")?;
+    let mut session = state
+        .sessions
+        .get(&session_name)
+        .cloned()
+        .with_context(|| format!("Session '{session_name}' does not exist"))?;
 
     let target_map =
-        set_service_targets(&mut state, &args.service_names, args.all, service_target)?;
+        set_service_targets(&mut session, &args.service_names, args.all, service_target)?;
 
-    services::local_server::update_state(&mut state, machine_id).await?;
+    services::local_server::upsert_tunneled_session(
+        machine_id,
+        Some(session_name.clone()),
+        session,
+    )
+    .await?;
 
     let name_width = target_map
         .iter()
@@ -59,7 +74,7 @@ pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
         .max()
         .unwrap_or(0);
 
-    println!("\nSession: {}", state.linkup.session_name.bold());
+    println!("\nSession: {}", session_name.bold());
     for (service_name, url) in &target_map {
         println!(
             "  {:<width$}  ->  {}",
@@ -73,7 +88,7 @@ pub async fn route(args: &Args, machine_id: MachineId) -> Result<()> {
 }
 
 fn set_service_targets(
-    state: &mut State,
+    session: &mut SessionState,
     service_names: &[String],
     all: bool,
     target: ServiceTarget,
@@ -81,14 +96,14 @@ fn set_service_targets(
     let mut new_targets = Vec::new();
 
     if all {
-        for service in state.services.iter_mut() {
+        for service in session.services.iter_mut() {
             service.current = target.clone();
 
             new_targets.push((service.config.name.clone(), service.current_url()));
         }
     } else {
         for service_name in service_names {
-            let service = state
+            let service = session
                 .services
                 .iter_mut()
                 .find(|s| s.config.name.as_str() == service_name)

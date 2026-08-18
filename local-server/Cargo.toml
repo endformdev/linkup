@@ -16,8 +16,9 @@ linkup = { workspace = true }
 linkup-clients = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "signal", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "signal", "rt-multi-thread", "sync"] }
 tokio-tungstenite = { workspace = true, features = ["rustls-tls-native-roots"] }
 url = { workspace = true }
 

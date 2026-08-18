@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use linkup::{
-    DnsListResponse, PreviewSessionRequest, SessionDetailResponse, SessionResponse,
-    SessionsListResponse, TunneledSessionRequest, TunneledSessionResponse,
+    DnsListResponse, LocalTunneledSessionRequest, PreviewSessionRequest, SessionDetailResponse,
+    SessionResponse, SessionsListResponse, TunneledSessionResponse,
 };
 use reqwest::StatusCode;
 use serde::{Serialize, de::DeserializeOwned};
@@ -55,7 +55,7 @@ impl LocalServerClient {
 
     pub async fn tunneled_session(
         &self,
-        params: &TunneledSessionRequest,
+        params: &LocalTunneledSessionRequest,
     ) -> Result<TunneledSessionResponse, Error> {
         self.post("/linkup/sessions/tunneled", params).await
     }

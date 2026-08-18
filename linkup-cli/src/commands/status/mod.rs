@@ -51,9 +51,9 @@ pub async fn status(args: &Args) -> anyhow::Result<()> {
 
     let target_session = args
         .session
-        .as_deref()
-        .unwrap_or(&state.linkup.session_name)
-        .to_string();
+        .clone()
+        .or_else(|| state.default_session.clone())
+        .context("No default session is configured; specify one with --session")?;
 
     let all_sessions = list_session_rows().await;
 
@@ -71,7 +71,10 @@ pub async fn status(args: &Args) -> anyhow::Result<()> {
     let session_detail = fetch_session_detail(&target_session).await;
 
     let config_path: PathBuf = state
-        .linkup
+        .sessions
+        .get(&target_session)
+        .or_else(|| state.default_session().map(|(_, session)| session))
+        .context("No persisted session configuration is available")?
         .config_path
         .parse()
         .expect("Config path stored on state should be valid Path");

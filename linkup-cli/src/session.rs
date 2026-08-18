@@ -1,9 +1,9 @@
 use colored::Colorize;
-use linkup::{Domain, SessionKind};
+use linkup::{Domain, SessionKind, SessionState};
 use linkup_clients::LocalServerClient;
 use serde::{Deserialize, Serialize};
 
-use crate::{services::local_server, state::State};
+use crate::services::local_server;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SessionRow {
@@ -13,11 +13,11 @@ pub struct SessionRow {
 }
 
 impl SessionRow {
-    pub fn from_state(state: &State, kind: SessionKind) -> Self {
+    pub fn from_session(name: &str, session: &SessionState, kind: SessionKind) -> Self {
         SessionRow {
-            name: state.linkup.session_name.clone(),
+            name: name.to_string(),
             kind,
-            domains: format_state_domains(&state.linkup.session_name, &state.domains),
+            domains: format_state_domains(name, &session.domains),
         }
     }
 }

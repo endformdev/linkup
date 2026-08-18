@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, anyhow};
-use linkup::MachineId;
+use linkup::{MachineId, SessionState, TunnelData};
 
 use crate::{
     Result,
@@ -24,70 +24,84 @@ pub async fn start(_args: &Args, config_arg: Option<&Path>, machine_id: MachineI
         return Ok(());
     }
 
-    let mut state = load_and_save_state(config_arg)?;
-    set_linkup_env(state.clone())?;
+    let (_state, sessions) = load_state_and_sessions(config_arg)?;
 
-    // TODO(@augustoccesar)[2026-05-20]: This should be removed once we actually start
-    //  having multiple state files again (if we decide that we will do it this way).
     state::cleanup_legacy_state_files();
 
     services::local_server::start().await?;
 
-    let tunnel_data = match services::local_server::update_state(&mut state, machine_id).await {
-        Ok(tunnel_data) => {
-            log::info!("Finished setting up!");
-            tunnel_data
-        }
-        Err(e) => {
-            log::error!("Failed to upload state: {e}");
-            return Err(e);
-        }
-    };
+    let mut tunnel_data: Option<TunnelData> = None;
+    for (session_name, session) in sessions {
+        let response =
+            services::local_server::upsert_tunneled_session(machine_id, session_name, session)
+                .await?;
+        tunnel_data.get_or_insert(response.tunnel_data);
+    }
+
+    let state = State::load()?;
+    restore_linkup_env(&state);
+    log::info!("Finished setting up!");
 
     if state.should_use_tunnel() {
-        let tunnel_url = services::cloudflared::start(&tunnel_data).await?;
+        let tunnel_data =
+            tunnel_data.context("No tunnel data returned while restoring sessions")?;
 
-        if let Err(e) = services::cloudflared::update_state(&mut state, &tunnel_url) {
-            log::error!("Failed to update state with tunnel information.");
-            return Err(e);
-        }
+        services::cloudflared::start(&tunnel_data).await?;
     } else {
         log::info!("Skipping. State file requested no tunnel.");
     }
 
-    let rows = vec![SessionRow::from_state(
-        &state,
-        linkup::SessionKind::Tunneled,
-    )];
+    let rows = state
+        .sessions
+        .iter()
+        .map(|(name, session)| {
+            SessionRow::from_session(name, session, linkup::SessionKind::Tunneled)
+        })
+        .collect::<Vec<_>>();
 
     println!();
-    print_sessions_table(&rows, None);
+    print_sessions_table(&rows, state.default_session.as_deref());
 
     Ok(())
 }
 
-fn set_linkup_env(state: State) -> Result<()> {
-    // Set env vars to linkup
-    for service in &state.services {
-        if let Some(d) = &service.config.directory {
-            set_service_env(d.clone(), state.linkup.config_path.clone())?
+fn restore_linkup_env(state: &State) {
+    for (name, session) in &state.sessions {
+        if let Err(error) = set_session_env(session) {
+            log::warn!("Could not restore environment files for session '{name}': {error}");
         }
     }
+}
+
+pub(crate) fn set_session_env(session: &SessionState) -> Result<()> {
+    for service in &session.services {
+        if let Some(directory) = &service.config.directory {
+            set_service_env(directory.clone(), session.config_path.clone())?
+        }
+    }
+
     Ok(())
 }
 
-fn load_and_save_state(config_arg: Option<&Path>) -> Result<State> {
-    let mut state = State::from_config(config_arg)?;
+fn load_state_and_sessions(
+    config_arg: Option<&Path>,
+) -> Result<(State, Vec<(Option<String>, SessionState)>)> {
+    if let Ok(state) = State::load()
+        && !state.sessions.is_empty()
+    {
+        let sessions = state
+            .sessions
+            .iter()
+            .map(|(name, session)| (Some(name.clone()), session.clone()))
+            .collect();
 
-    if let Ok(previous_state) = State::load() {
-        state.linkup.session_name = previous_state.linkup.session_name;
-        state.linkup.session_token = previous_state.linkup.session_token;
-        state.linkup.tunnel = previous_state.linkup.tunnel;
+        return Ok((state, sessions));
     }
 
+    let (state, session) = State::from_config(config_arg)?;
     state.save()?;
 
-    Ok(state)
+    Ok((state, vec![(None, session)]))
 }
 
 fn set_service_env(directory: String, config_path: String) -> Result<()> {

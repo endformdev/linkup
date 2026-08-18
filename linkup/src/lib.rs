@@ -2,6 +2,7 @@ pub mod config;
 pub mod serde_ext;
 
 mod headers;
+mod local_state;
 mod machine;
 mod memory_session_store;
 mod name_gen;
@@ -19,6 +20,7 @@ use thiserror::Error;
 
 pub use headers::normalize_cookie_header;
 pub use headers::{HeaderMap, HeaderName};
+pub use local_state::*;
 pub use machine::*;
 pub use memory_session_store::*;
 pub use name_gen::{random_animal, random_six_char};

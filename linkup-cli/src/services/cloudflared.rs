@@ -16,7 +16,7 @@ use url::Url;
 use linkup::TunnelData;
 
 use super::{PidError, ServiceId};
-use crate::{Result, linkup_file_path, state::State};
+use crate::{Result, linkup_file_path};
 
 const ID: ServiceId = ServiceId("cloudflare-tunnel");
 
@@ -104,17 +104,6 @@ pub fn stop() {
 
 pub fn find_pid() -> Option<Pid> {
     super::find_pid(ID)
-}
-
-pub fn update_state(state: &mut State, tunnel_url: &Url) -> Result<()> {
-    log::debug!("Adding tunnel url {} to the state", tunnel_url.as_str());
-
-    state.linkup.tunnel = Some(tunnel_url.clone());
-    state
-        .save()
-        .expect("failed to update local state file with tunnel url");
-
-    Ok(())
 }
 
 async fn spawn_process(tunnel_data: &TunnelData, pidfile_path: &Path) -> Result<()> {

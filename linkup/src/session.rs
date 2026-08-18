@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{MachineId, TunnelData, config::Config};
+use crate::{MachineId, SessionState, TunnelData, config::Config};
 
 pub const PREVIEW_SESSION_TOKEN: &str = "preview_session";
 
@@ -59,6 +59,24 @@ pub struct TunneledSessionRequest {
     pub session_name: Option<String>,
     pub session_token: String,
     pub definition: SessionDefinition,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LocalTunneledSessionRequest {
+    pub machine_id: MachineId,
+    pub session_name: Option<String>,
+    pub session: SessionState,
+}
+
+impl From<&LocalTunneledSessionRequest> for TunneledSessionRequest {
+    fn from(request: &LocalTunneledSessionRequest) -> Self {
+        Self {
+            machine_id: request.machine_id,
+            session_name: request.session_name.clone(),
+            session_token: request.session.token.clone(),
+            definition: (&request.session).into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -7,8 +7,8 @@ use axum::{
 };
 use http::StatusCode;
 use linkup::{
-    NameKind, PreviewSessionRequest, Session, SessionDetailResponse, SessionKind,
-    SessionsListResponse, TunneledSessionRequest,
+    LocalTunneledSessionRequest, PreviewSessionRequest, Session, SessionDetailResponse,
+    SessionKind, SessionsListResponse, TunneledSessionRequest,
 };
 use linkup_clients::WorkerClientError;
 
@@ -78,9 +78,14 @@ pub async fn upsert_preview(
 
 pub async fn upsert_tunneled(
     State(server_state): State<ServerState>,
-    Json(request): Json<TunneledSessionRequest>,
+    Json(request): Json<LocalTunneledSessionRequest>,
 ) -> impl IntoResponse {
-    let tunneled_session = match server_state.worker_client.tunneled_session(&request).await {
+    let worker_request = TunneledSessionRequest::from(&request);
+    let tunneled_session = match server_state
+        .worker_client
+        .tunneled_session(&worker_request)
+        .await
+    {
         Ok(tunneled_session) => tunneled_session,
         Err(error) => match error {
             WorkerClientError::Response(StatusCode::CONFLICT, _) => {
@@ -98,8 +103,8 @@ pub async fn upsert_tunneled(
 
     let session = match Session::new(
         SessionKind::Tunneled,
-        request.session_token,
-        request.definition,
+        request.session.token.clone(),
+        (&request.session).into(),
     ) {
         Ok(conf) => conf,
         Err(e) => {
@@ -113,7 +118,7 @@ pub async fn upsert_tunneled(
 
     let local_session_result = server_state
         .session_allocator
-        .store_session(&session, NameKind::Animal, &tunneled_session.session_name)
+        .strict_store_session(&tunneled_session.session_name, &session)
         .await;
 
     if let Err(error) = local_session_result {
@@ -137,6 +142,34 @@ pub async fn upsert_tunneled(
         );
 
         server_state.dns_catalog.register_record(&full_domain).await;
+    }
+
+    if let Some(state_store) = &server_state.state_store {
+        let tunnel_url = match tunneled_session.tunnel_data.url.parse() {
+            Ok(url) => url,
+            Err(error) => {
+                return ApiError::new(
+                    format!("Worker returned an invalid tunnel URL: {error}"),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .into_response();
+            }
+        };
+
+        if let Err(error) = state_store
+            .upsert_session(
+                tunneled_session.session_name.clone(),
+                request.session,
+                tunnel_url,
+            )
+            .await
+        {
+            return ApiError::new(
+                format!("Failed to persist local state: {error}"),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .into_response();
+        }
     }
 
     (StatusCode::OK, Json(tunneled_session)).into_response()
@@ -187,6 +220,16 @@ pub async fn delete_session(
             .dns_catalog
             .deregister_record(&full_domain)
             .await;
+    }
+
+    if let Some(state_store) = &server_state.state_store
+        && let Err(error) = state_store.delete_session(&session_name).await
+    {
+        return ApiError::new(
+            format!("Failed to persist local state: {error}"),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+        .into_response();
     }
 
     StatusCode::NO_CONTENT.into_response()

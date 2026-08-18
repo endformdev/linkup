@@ -7,19 +7,15 @@ use std::{
 };
 
 use anyhow::Context;
-use reqwest::StatusCode;
 use sysinfo::Pid;
 use tokio::time::sleep;
 use url::Url;
 
-use linkup::{
-    MachineId, SessionDefinition, SessionKind, TunnelData, TunneledSessionRequest,
-    TunneledSessionResponse,
-};
-use linkup_clients::{LocalServerClient, LocalServerClientError};
+use linkup::{LocalTunneledSessionRequest, MachineId, SessionState, TunneledSessionResponse};
+use linkup_clients::LocalServerClient;
 
 use super::{PidError, ServiceId};
-use crate::{Result, linkup_certs_dir_path, linkup_file_path, state::State};
+use crate::{Result, linkup_certs_dir_path, linkup_file_path};
 
 const ID: ServiceId = ServiceId("linkup-local-server");
 const NAME: &str = "Linkup local server";
@@ -88,59 +84,20 @@ pub async fn is_reachable() -> bool {
     )
 }
 
-pub async fn update_state(state: &mut State, machine_id: MachineId) -> Result<TunnelData> {
-    log::info!("Uploading state to server...");
-    let tunneled_session = upload_tunneled_state(state, machine_id).await?;
-
-    log::info!("Updating local state file...");
-    state.linkup.session_name = tunneled_session.session_name;
-    state.linkup.kind = SessionKind::Tunneled;
-    state
-        .save()
-        .expect("failed to update local state file with session name");
-
-    Ok(tunneled_session.tunnel_data)
-}
-
-async fn upload_tunneled_state(
-    state: &State,
+pub async fn upsert_tunneled_session(
     machine_id: MachineId,
+    session_name: Option<String>,
+    session: SessionState,
 ) -> Result<TunneledSessionResponse> {
+    log::info!("Uploading session to server...");
     let local_server_client = LocalServerClient::new(&url());
-    let definition: SessionDefinition = state.into();
-    let session_name =
-        (!state.linkup.session_name.is_empty()).then(|| state.linkup.session_name.clone());
-    let request = TunneledSessionRequest {
+    let request = LocalTunneledSessionRequest {
         machine_id,
         session_name,
-        session_token: state.linkup.session_token.clone(),
-        definition,
+        session,
     };
 
-    let session_response = local_server_client.tunneled_session(&request).await;
-
-    let session_response = match session_response {
-        Ok(session_response) => session_response,
-        Err(LocalServerClientError::Response(StatusCode::CONFLICT, _)) => {
-            log::debug!(
-                "Requested name from state file already exists, attempting to create with a new name"
-            );
-
-            let unnamed_request = TunneledSessionRequest {
-                machine_id,
-                session_name: None,
-                session_token: request.session_token,
-                definition: request.definition,
-            };
-
-            local_server_client
-                .tunneled_session(&unnamed_request)
-                .await?
-        }
-        Err(error) => return Err(error.into()),
-    };
-
-    Ok(session_response)
+    Ok(local_server_client.tunneled_session(&request).await?)
 }
 
 fn spawn_process() -> Result<()> {

@@ -28,6 +28,7 @@ pub async fn setup_server(
                 https_client: linkup_clients::https_client(),
                 dns_catalog: DnsCatalog::new(),
                 https_certs_dir: PathBuf::default(),
+                state_store: None,
                 worker_client: WorkerClient::new(
                     &Url::parse("http://localhost").unwrap(),
                     "token123",

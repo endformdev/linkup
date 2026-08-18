@@ -14,17 +14,17 @@ pub fn stop(_args: &Args, clear_env: bool) -> Result<()> {
     match (State::load(), clear_env) {
         (Ok(state), true) => {
             // Reset env vars back to what they were before
-            for service in &state.services {
-                let remove_res = match &service.config.directory {
-                    Some(d) => remove_service_env(d.clone(), state.linkup.config_path.clone()),
-                    None => Ok(()),
-                };
-
-                if let Err(e) = remove_res {
-                    println!(
-                        "Could not remove env for service {}: {}",
-                        service.config.name, e
-                    );
+            for session in state.sessions.values() {
+                for service in &session.services {
+                    if let Some(directory) = &service.config.directory
+                        && let Err(error) =
+                            remove_service_env(directory.clone(), session.config_path.clone())
+                    {
+                        println!(
+                            "Could not remove env for service {}: {}",
+                            service.config.name, error
+                        );
+                    }
                 }
             }
         }

@@ -161,8 +161,11 @@ impl States {
         for (state_file_name, state) in &self.items {
             writeln!(
                 writer,
-                "{:>offset$}- [{}] {} ({})",
-                "", state_file_name, state.linkup.session_name, state.linkup.kind,
+                "{:>offset$}- [{}] default: {} ({} sessions)",
+                "",
+                state_file_name,
+                state.default_session.as_deref().unwrap_or("none"),
+                state.sessions.len(),
             )?;
         }
 
@@ -197,7 +200,7 @@ impl LinkupServices {
 
         let remote_server_url = state
             .as_ref()
-            .map(|state| state.linkup.worker_url.join("/linkup/check"))
+            .map(|state| state.worker_url.join("/linkup/check"))
             .transpose()?;
         let remote_server =
             remote_server_url.map(|url| thread::spawn(move || LinkupService::load(url)));
