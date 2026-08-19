@@ -14,8 +14,13 @@ use crate::{
 
 #[derive(clap::Args)]
 pub struct Args {
-    #[arg(long, value_name = "NAME", help = "Request a specific session name")]
-    name: Option<String>,
+    #[arg(
+        long,
+        alias = "name",
+        value_name = "SUFFIX",
+        help = "Suffix appended to the main session name"
+    )]
+    suffix: Option<String>,
 
     #[arg(
         long,
@@ -51,7 +56,7 @@ pub async fn run(args: &Args, config_arg: Option<&Path>, machine_id: MachineId) 
     set_initial_routes(&mut session, &args.local, args.all_local)?;
 
     let response =
-        local_server::upsert_tunneled_session(machine_id, args.name.clone(), session.clone())
+        local_server::upsert_tunneled_session(machine_id, args.suffix.clone(), session.clone())
             .await
             .context("Failed to create tunneled session")?;
 

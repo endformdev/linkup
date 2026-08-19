@@ -43,6 +43,21 @@ linkup route local web  # Route `web` traffic to your local dev server
 linkup status           # Check which services are where
 ```
 
+### Additional Tunneled Sessions
+
+Create another tunneled session with a suffix that identifies its purpose:
+
+```sh
+linkup sessions create --suffix agent
+```
+
+The suffix is appended to the main session name. For example, if the main
+session is `slim-gecko`, this command creates `slim-gecko-agent`. If no suffix
+is provided, Linkup generates a random six-character suffix.
+
+Suffixes may contain lowercase letters, numbers, and hyphens. The complete
+session name, including the main name and suffix, cannot exceed 63 characters.
+
 [Local DNS](/linkup/guides/local-dns) is optional here. Installing it makes
 requests that originate on your machine skip Cloudflare and resolve directly to
 the local server, which is a significant speedup for asset-heavy frontends.
