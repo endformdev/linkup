@@ -8,6 +8,12 @@ use clap::Subcommand;
 
 #[derive(clap::Args)]
 pub struct Args {
+    #[clap(subcommand)]
+    subcommand: InfraSubcommand,
+}
+
+#[derive(clap::Args)]
+struct CloudflareArgs {
     #[arg(short = 'e', long = "email", help = "Cloudflare user email")]
     pub email: String,
 
@@ -25,9 +31,6 @@ pub struct Args {
         required = true
     )]
     pub zone_ids: Vec<String>,
-
-    #[clap(subcommand)]
-    subcommand: InfraSubcommand,
 }
 
 #[derive(Subcommand)]
@@ -41,7 +44,7 @@ pub enum InfraSubcommand {
 
 pub async fn infra(args: &Args) -> Result<()> {
     match &args.subcommand {
-        InfraSubcommand::Deploy(deploy_args) => deploy::deploy(deploy_args, args).await,
-        InfraSubcommand::Destroy(destroy_args) => destroy::destroy(destroy_args, args).await,
+        InfraSubcommand::Deploy(deploy_args) => deploy::deploy(deploy_args).await,
+        InfraSubcommand::Destroy(destroy_args) => destroy::destroy(destroy_args).await,
     }
 }

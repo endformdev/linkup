@@ -6,14 +6,19 @@ use super::cloudflare::{
     resources::{TargetCfResources, cf_resources},
 };
 use super::{
-    Args as InfraArgs,
+    CloudflareArgs,
     notifier::{ConsoleNotifier, DeployNotifier},
 };
 
 #[derive(clap::Args)]
-pub struct DestroyArgs {}
+pub struct DestroyArgs {
+    #[command(flatten)]
+    cloudflare: CloudflareArgs,
+}
 
-pub async fn destroy(_args: &DestroyArgs, infra_args: &InfraArgs) -> Result<()> {
+pub async fn destroy(args: &DestroyArgs) -> Result<()> {
+    let infra_args = &args.cloudflare;
+
     println!("Destroying from Cloudflare...");
     println!("Account ID: {}", infra_args.account_id);
     println!("Zone IDs: {:?}", infra_args.zone_ids);

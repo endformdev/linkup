@@ -6,14 +6,19 @@ use super::cloudflare::{
     resources::{TargetCfResources, cf_resources},
 };
 use super::{
-    Args as InfraArgs,
+    CloudflareArgs,
     notifier::{ConsoleNotifier, DeployNotifier},
 };
 
 #[derive(clap::Args)]
-pub struct DeployArgs {}
+pub struct DeployArgs {
+    #[command(flatten)]
+    cloudflare: CloudflareArgs,
+}
 
-pub async fn deploy(_args: &DeployArgs, infra_args: &InfraArgs) -> Result<()> {
+pub async fn deploy(args: &DeployArgs) -> Result<()> {
+    let infra_args = &args.cloudflare;
+
     println!("Deploying to Cloudflare...");
     println!("Account ID: {}", infra_args.account_id);
     println!("Zone IDs: {:?}", infra_args.zone_ids);
