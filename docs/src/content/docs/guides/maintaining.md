@@ -5,16 +5,6 @@ description: How to keep Linkup up to date and remove it if needed
 
 ## Updating
 
-### With Homebrew
-
-If you installed Linkup via Homebrew, update through Homebrew:
-
-```sh
-brew upgrade linkup
-```
-
-### With linkup update
-
 If you installed Linkup via the install script, use the built-in update command:
 
 ```sh
@@ -57,6 +47,6 @@ You will be asked to confirm before anything is removed. On confirmation, it:
 1. Stops any running Linkup session (`linkup stop`)
 2. Uninstalls Local DNS if it was installed (`linkup local-dns uninstall`)
 3. Removes the Linkup binary, using the right method for how you installed it
-   (Homebrew, Cargo, or manual script)
+   (Cargo or the install script)
 4. Removes the `~/.linkup/` directory and all state, certificates, and logs
    stored there

@@ -3,7 +3,7 @@
 set -e
 
 CHANNEL="stable"
-GITHUB_API="https://api.github.com/repos/mentimeter/linkup"
+GITHUB_API="https://api.github.com/repos/endformdev/linkup"
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
@@ -20,13 +20,27 @@ parse_args() {
 }
 
 check_dependencies() {
-    command -v linkup >/dev/null 2>&1 && { echo "Linkup is already installed. To update it, run 'linkup update'."; exit 0; }
     command -v curl >/dev/null 2>&1 || { echo "curl is required." >&2; exit 1; }
     command -v cloudflared >/dev/null 2>&1 || {
         echo "WARN: 'cloudflared' is not installed. Please install it before installing Linkup." >&2
         echo "More info: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" >&2
         exit 1
     }
+
+    if command -v linkup >/dev/null 2>&1; then
+        local installed_path expected_path
+        installed_path=$(command -v linkup)
+        [ "$(uname -s)" = "Darwin" ] \
+            && expected_path="$HOME/.linkup/bin/linkup" \
+            || expected_path="/usr/local/bin/linkup"
+
+        if [ "$installed_path" != "$expected_path" ]; then
+            echo "Linkup is already managed at ${installed_path}. Remove that installation before using this script." >&2
+            exit 1
+        fi
+
+        echo "Replacing the existing Linkup installation at ${installed_path}." >&2
+    fi
 }
 
 detect_target() {
@@ -103,7 +117,25 @@ install_binary() {
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
 
-    curl -fsSL "$download_url" | tar -xz -C "$tmp"
+    local archive="$tmp/linkup.tar.gz"
+    local checksum="$tmp/linkup.tar.gz.sha256"
+    curl -fsSL "$download_url" -o "$archive"
+    curl -fsSL "${download_url}.sha256" -o "$checksum"
+
+    local expected_checksum actual_checksum
+    expected_checksum=$(awk '{print $1}' "$checksum")
+    if [ "$(uname -s)" = "Darwin" ]; then
+        actual_checksum=$(shasum -a 256 "$archive" | awk '{print $1}')
+    else
+        actual_checksum=$(sha256sum "$archive" | awk '{print $1}')
+    fi
+
+    if [ -z "$expected_checksum" ] || [ "$actual_checksum" != "$expected_checksum" ]; then
+        echo "Checksum verification failed for ${target}." >&2
+        exit 1
+    fi
+
+    tar -xzf "$archive" -C "$tmp"
 
     if [ "$(uname -s)" = "Darwin" ]; then
         mkdir -p "$install_dir"

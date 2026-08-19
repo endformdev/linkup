@@ -4,13 +4,13 @@ import starlight from "@astrojs/starlight";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://mentimeter.github.io",
+  site: "https://endformdev.github.io",
   base: "linkup",
   integrations: [
     starlight({
       title: "Linkup",
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/mentimeter/linkup' },
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/endformdev/linkup' },
       ],
       sidebar: [
         {

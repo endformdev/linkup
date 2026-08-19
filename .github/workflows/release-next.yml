@@ -1,98 +1,72 @@
-name: Create Beta Release (next)
+name: Create Beta Release
 
 on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "Branch to release from"
+        description: Branch to release from
         required: false
-        default: "next"
-  # push:
-  #   branches:
-  #     - next
+        default: next
+
+permissions:
+  contents: write
 
 concurrency:
-  group: release-next
+  group: release-beta
   cancel-in-progress: true
 
 jobs:
-  resolve-branch:
-    name: Resolve Branch
+  prepare:
+    name: Prepare Beta Release
     runs-on: ubuntu-latest
     outputs:
-      branch: ${{ steps.resolve.outputs.branch }}
-    steps:
-      - name: Resolve
-        id: resolve
-        run: echo "branch=${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}" >> "$GITHUB_OUTPUT"
-
-  generate-version:
-    name: Generate Release Version
-    runs-on: ubuntu-latest
-    needs: [resolve-branch]
-    outputs:
-      version: ${{ steps.generate_version.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ needs.resolve-branch.outputs.branch }}
+          ref: ${{ inputs.branch }}
 
-      - name: Generate Next Release Version
-        id: generate_version
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const { execSync } = require('child_process');
-            const fs = require('fs');
-            const path = require('path');
+      - name: Resolve release
+        id: release
+        run: |
+          short_sha=$(git rev-parse --short HEAD)
+          version="0.0.0-next-$(date -u +%Y%m%d%H%M)-$short_sha"
 
-            const shortSha = execSync('git rev-parse --short HEAD').toString().trim();
-            const now = new Date();
-            const pad = (n) => n.toString().padStart(2, '0');
-            const timestamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}`;
-            const nextVersion = `0.0.0-next-${timestamp}-${shortSha}`;
-
-            core.info(`Set release version to ${nextVersion}`);
-
-            core.setOutput('version', nextVersion);
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Preparing beta release $version"
 
   build:
-    name: Build
+    name: Build (${{ matrix.target }})
+    needs: prepare
     runs-on: ${{ matrix.os }}
-    needs: [resolve-branch, generate-version]
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # - build: linux
-          #   os: depot-ubuntu-22.04-8
-          #   target: x86_64-unknown-linux-gnu
-          # - build: aarch64
-          #   os: depot-ubuntu-22.04-arm-8
-          #   target: aarch64-unknown-linux-gnu
-          #   linker: gcc-aarch64-linux-gnu
-          # - build: macos
-          #   os: depot-macos-14
-          #   target: x86_64-apple-darwin
-          - build: macos-aarch64
-            os: depot-macos-14
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-15
             target: aarch64-apple-darwin
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ needs.resolve-branch.outputs.branch }}
+          ref: ${{ needs.prepare.outputs.commit }}
 
-      - name: Update Cargo.toml Version
-        run: |
-          sed -i.bak 's@^version = .*@version = "${{ needs.generate-version.outputs.version }}"@' Cargo.toml
-          rm Cargo.toml.bak
+      - name: Set beta version
+        run: sed -i.bak 's@^version = .*@version = "${{ needs.prepare.outputs.version }}"@' Cargo.toml
 
       - name: Install Rust
         run: |
           rustup install stable
-          rustup target add ${{ matrix.target }}
-          rustup show
+          rustup target add "${{ matrix.target }}"
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
@@ -100,59 +74,47 @@ jobs:
           cache-on-failure: true
 
       - name: Build
-        run: cargo build --release --manifest-path linkup-cli/Cargo.toml --target ${{ matrix.target }}
+        run: cargo build --release --manifest-path linkup-cli/Cargo.toml --target "${{ matrix.target }}"
 
-      - name: Package and Calculate Checksums
-        id: package
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - name: Package artifact
         env:
           TARGET: ${{ matrix.target }}
-          RUNNER_OS: ${{ runner.os }}
-          RELEASE_VERSION: ${{ needs.generate-version.outputs.version }}
+        run: |
+          mkdir dist
+          archive="linkup-$TARGET.tar.gz"
+          tar -czf "dist/$archive" -C "target/$TARGET/release" linkup
+
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            (cd dist && sha256sum "$archive" > "$archive.sha256")
+          else
+            (cd dist && shasum -a 256 "$archive" > "$archive.sha256")
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          script: |
-            const { execSync } = require('child_process');
-            const fs = require('fs');
-            const os = require('os');
-            const path = require('path');
+          name: linkup-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
 
-            const releaseVersion = process.env.RELEASE_VERSION;
-            const target = process.env.TARGET;
-            const runnerOs = process.env.RUNNER_OS;
-            if (!releaseVersion) {
-              throw new Error("RELEASE_VERSION is not set");
-            }
+  release:
+    name: Publish GitHub Pre-release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          merge-multiple: true
 
-            const binaryPath = `target/${target}/release/linkup`;
-
-            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'linkup-'));
-
-            fs.copyFileSync(binaryPath, path.join(tmpDir, 'linkup'));
-
-            const assetName = `linkup-${target}.tar.gz`;
-            execSync(`tar czf ${assetName} -C ${tmpDir} linkup`);
-
-            let checksum;
-            if (runnerOs === 'Linux') {
-              checksum = execSync(`sha256sum ${assetName}`).toString().split(' ')[0];
-            } else {
-              checksum = execSync(`shasum -a 256 ${assetName}`).toString().split(' ')[0];
-            }
-
-            const checksumFile = `${assetName}.sha256`;
-            fs.writeFileSync(checksumFile, `${checksum} ${assetName}`);
-
-            core.setOutput('asset_name', assetName);
-            core.setOutput('checksum_file', checksumFile);
-
-      - name: Release
+      - name: Create pre-release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
-          tag_name: ${{ needs.generate-version.outputs.version }}
-          target_commitish: ${{ needs.resolve-branch.outputs.branch }}
+          name: ${{ needs.prepare.outputs.version }}
+          tag_name: ${{ needs.prepare.outputs.version }}
+          target_commitish: ${{ needs.prepare.outputs.commit }}
           prerelease: true
-          files: |
-            ${{ steps.package.outputs.asset_name }}
-            ${{ steps.package.outputs.checksum_file }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/*

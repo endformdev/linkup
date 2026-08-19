@@ -5,6 +5,7 @@ mod github {
     use linkup::VersionError;
     use reqwest::header::HeaderValue;
     use serde::{Deserialize, Serialize, de::DeserializeOwned};
+    use sha2::{Digest, Sha256};
     use tar::Archive;
     use url::Url;
 
@@ -18,13 +19,17 @@ mod github {
         MissingBinary,
         #[error("Release have an invalid tag")]
         InvalidVersionTag(#[from] VersionError),
+        #[error("Release checksum is missing or invalid")]
+        InvalidChecksum,
+        #[error("Downloaded release does not match its checksum")]
+        ChecksumMismatch,
         #[error("Hit a rate limit while checking for updates")]
         RateLimit(u64),
     }
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Release {
-        #[serde(rename = "name")]
+        #[serde(rename = "tag_name")]
         pub version: String,
         pub assets: Vec<Asset>,
     }
@@ -35,7 +40,7 @@ mod github {
         /// - linkup-aarch64-apple-darwin.tar.gz
         /// - linkup-x86_64-unknown-linux-gnu.tar.gz
         /// - linkup-aarch64-unknown-linux-gnu.tar.gz
-        pub fn linkup_asset(&self, os: &str, arch: &str) -> Option<Asset> {
+        pub fn linkup_assets(&self, os: &str, arch: &str) -> Option<(Asset, Asset)> {
             let lookup_os = match os {
                 "macos" => "apple-darwin",
                 "linux" => "unknown-linux",
@@ -45,19 +50,31 @@ mod github {
             let asset = self
                 .assets
                 .iter()
-                .find(|asset| asset.name.contains(lookup_os) && asset.name.contains(arch))
+                .find(|asset| {
+                    asset.name.contains(lookup_os)
+                        && asset.name.contains(arch)
+                        && asset.name.ends_with(".tar.gz")
+                })
                 .cloned();
 
-            if asset.is_none() {
+            let checksum = asset.as_ref().and_then(|asset| {
+                let checksum_name = format!("{}.sha256", asset.name);
+                self.assets
+                    .iter()
+                    .find(|candidate| candidate.name == checksum_name)
+                    .cloned()
+            });
+
+            if asset.is_none() || checksum.is_none() {
                 log::debug!(
-                    "Linkup release for OS '{}' and ARCH '{}' not found on version {}",
+                    "Complete Linkup release for OS '{}' and ARCH '{}' not found on version {}",
                     lookup_os,
                     arch,
                     self.version
                 );
             }
 
-            asset
+            asset.zip(checksum)
         }
     }
 
@@ -70,7 +87,7 @@ mod github {
 
     impl Asset {
         async fn inner_download(&self) -> Result<PathBuf, Error> {
-            let response = reqwest::get(&self.download_url).await?;
+            let response = reqwest::get(&self.download_url).await?.error_for_status()?;
 
             let file_path = env::temp_dir().join(&self.name);
             let mut file = fs::File::create(&file_path)?;
@@ -81,9 +98,22 @@ mod github {
             Ok(file_path)
         }
 
-        pub async fn download(&self) -> Result<PathBuf, Error> {
+        pub async fn download(&self, checksum: &Asset) -> Result<PathBuf, Error> {
             let filename = "linkup";
             let file_path = self.inner_download().await?;
+            let checksum_path = checksum.inner_download().await?;
+            let expected_checksum = fs::read_to_string(checksum_path)?
+                .split_whitespace()
+                .next()
+                .filter(|checksum| checksum.len() == 64)
+                .and_then(|checksum| hex::decode(checksum).ok())
+                .ok_or(Error::InvalidChecksum)?;
+            let actual_checksum = Sha256::digest(fs::read(&file_path)?);
+
+            if actual_checksum.as_slice() != expected_checksum {
+                return Err(Error::ChecksumMismatch);
+            }
+
             let file = fs::File::open(&file_path)?;
 
             let decoder = GzDecoder::new(file);
@@ -112,20 +142,22 @@ mod github {
         }
     }
 
-    pub(super) async fn fetch_stable_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/mentimeter/linkup/releases/latest"
-            .parse()
-            .expect("GitHub URL to be correct");
+    fn releases_url(path: &str) -> Url {
+        let repository = env!("CARGO_PKG_REPOSITORY")
+            .strip_prefix("https://github.com/")
+            .expect("Cargo repository to be hosted on GitHub");
 
-        fetch(url).await
+        format!("https://api.github.com/repos/{repository}/releases{path}")
+            .parse()
+            .expect("GitHub releases URL to be valid")
+    }
+
+    pub(super) async fn fetch_stable_release() -> Result<Option<Release>, Error> {
+        fetch(releases_url("/latest")).await
     }
 
     pub(super) async fn fetch_beta_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/mentimeter/linkup/releases"
-            .parse()
-            .expect("GitHub URL to be correct");
-
-        let releases: Vec<Release> = fetch(url).await?.unwrap_or_default();
+        let releases: Vec<Release> = fetch(releases_url("")).await?.unwrap_or_default();
 
         let beta_release = releases
             .into_iter()
@@ -192,18 +224,20 @@ pub struct Release {
     pub channel: VersionChannel,
     pub version: Version,
     pub binary: Asset,
+    pub checksum: Asset,
 }
 
 impl Release {
     fn from_github_release(gh_release: &github::Release, os: &str, arch: &str) -> Option<Release> {
         let version = Version::try_from(gh_release.version.as_str());
-        let asset = gh_release.linkup_asset(os, arch);
+        let assets = gh_release.linkup_assets(os, arch);
 
-        match (version, asset) {
-            (Ok(version), Some(asset)) => Some(Release {
+        match (version, assets) {
+            (Ok(version), Some((binary, checksum))) => Some(Release {
                 channel: version.channel(),
                 version,
-                binary: asset,
+                binary,
+                checksum,
             }),
             _ => None,
         }

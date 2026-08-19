@@ -58,7 +58,7 @@ pub async fn update(args: &Args) -> Result<()> {
 
             let new_linkup_path = update
                 .binary
-                .download()
+                .download(&update.checksum)
                 .await
                 .with_context(|| "Failed to download new version")?;
 

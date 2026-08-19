@@ -1,7 +1,7 @@
 
 <h1  align="center" style="font-size: 3em;">🔗 Linkup</h1>
 
-<a href="https://mentimeter.github.io/linkup">
+<a href="https://endformdev.github.io/linkup">
   <img src="https://img.shields.io/badge/documentation-available-brightgreen" alt="Documentation">
 </a>
 
@@ -16,4 +16,4 @@ Linkup is written in Rust, and uses a combination of Cloudflare Workers and tunn
 
 ---
 
-🌐 [Documentation](https://mentimeter.github.io/linkup)
+🌐 [Documentation](https://endformdev.github.io/linkup)

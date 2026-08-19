@@ -183,7 +183,7 @@ pub enum CheckErr {
 #[derive(Parser)]
 #[command(
     name = "linkup",
-    about = "Connect remote and local dev/preview environments\n\nIf you need help running linkup, start here:\nhttps://mentimeter.github.io/linkup",
+    about = "Connect remote and local dev/preview environments\n\nIf you need help running linkup, start here:\nhttps://endformdev.github.io/linkup",
     version = env!("CARGO_PKG_VERSION"),
 )]
 struct Cli {
