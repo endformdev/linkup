@@ -62,6 +62,11 @@ detect_target() {
 }
 
 gh_api() {
+    if command -v gh >/dev/null 2>&1 && gh auth token --hostname github.com >/dev/null 2>&1; then
+        gh api "$1"
+        return
+    fi
+
     curl -fsSL \
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
