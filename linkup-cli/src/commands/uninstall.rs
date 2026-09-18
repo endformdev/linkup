@@ -58,7 +58,7 @@ pub async fn uninstall(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
             #[cfg(target_os = "linux")]
             {
                 println!("Linkup needs sudo access to:");
-                println!("  - Remove binary from {:?}", &exe_path);
+                println!("  - Remove binary from {:?}", exe_path);
 
                 if !is_sudo() {
                     sudo_su()?;

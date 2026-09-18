@@ -68,7 +68,7 @@ pub async fn update(args: &Args) -> Result<()> {
             #[cfg(target_os = "linux")]
             {
                 println!("Linkup needs sudo access to:");
-                println!("  - Update binary in {:?}", &current_linkup_path);
+                println!("  - Update binary in {:?}", current_linkup_path);
                 println!("  - Add capability to bind to port 80/443");
 
                 if !is_sudo() {
