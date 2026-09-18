@@ -58,18 +58,6 @@ pub async fn delete_tunnel(
     tunnel_id: &str,
 ) -> Result<(), DeleteTunnelError> {
     let client = crate::cloudflare_client(api_token);
-
-    let delete_tunnel_req = cloudflare::endpoints::cfd_tunnel::delete_tunnel::DeleteTunnel {
-        account_identifier: account_id,
-        tunnel_id,
-        params: cloudflare::endpoints::cfd_tunnel::delete_tunnel::Params { cascade: true },
-    };
-
-    client
-        .request(&delete_tunnel_req)
-        .await
-        .map_err(|error| DeleteTunnelError::DeleteCloudflareTunnel(error.to_string()))?;
-
     let get_dns_record_req = cloudflare::endpoints::dns::ListDnsRecords {
         zone_identifier: zone_id,
         params: cloudflare::endpoints::dns::ListDnsRecordsParams {
@@ -87,12 +75,8 @@ pub async fn delete_tunnel(
         .result;
 
     let record = match records.len() {
-        0 => {
-            return Err(DeleteTunnelError::GetDNSRecord(
-                "Fetching DNS for tunnel returned empty".to_string(),
-            ));
-        }
-        1 => &records[0],
+        0 => None,
+        1 => Some(&records[0]),
         2.. => {
             return Err(DeleteTunnelError::GetDNSRecord(
                 "Fetching DNS for tunnel returned more than one record".to_string(),
@@ -100,15 +84,28 @@ pub async fn delete_tunnel(
         }
     };
 
-    let delete_dns_record_red = cloudflare::endpoints::dns::DeleteDnsRecord {
-        zone_identifier: zone_id,
-        identifier: &record.id,
+    if let Some(record) = record {
+        let delete_dns_record_req = cloudflare::endpoints::dns::DeleteDnsRecord {
+            zone_identifier: zone_id,
+            identifier: &record.id,
+        };
+
+        client
+            .request(&delete_dns_record_req)
+            .await
+            .map_err(|error| DeleteTunnelError::DeleteDNSRecord(error.to_string()))?;
+    }
+
+    let delete_tunnel_req = cloudflare::endpoints::cfd_tunnel::delete_tunnel::DeleteTunnel {
+        account_identifier: account_id,
+        tunnel_id,
+        params: cloudflare::endpoints::cfd_tunnel::delete_tunnel::Params { cascade: true },
     };
 
     client
-        .request(&delete_dns_record_red)
+        .request(&delete_tunnel_req)
         .await
-        .map_err(|error| DeleteTunnelError::DeleteDNSRecord(error.to_string()))?;
+        .map_err(|error| DeleteTunnelError::DeleteCloudflareTunnel(error.to_string()))?;
 
     Ok(())
 }
