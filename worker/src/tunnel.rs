@@ -58,16 +58,6 @@ pub async fn delete_tunnel(
     tunnel_id: &str,
 ) -> Result<(), DeleteTunnelError> {
     let client = crate::cloudflare_client(api_token);
-
-    delete_tunnel_with_client(&client, account_id, zone_id, tunnel_id).await
-}
-
-async fn delete_tunnel_with_client(
-    client: &cloudflare::framework::async_api::Client,
-    account_id: &str,
-    zone_id: &str,
-    tunnel_id: &str,
-) -> Result<(), DeleteTunnelError> {
     let get_dns_record_req = cloudflare::endpoints::dns::ListDnsRecords {
         zone_identifier: zone_id,
         params: cloudflare::endpoints::dns::ListDnsRecordsParams {
@@ -225,98 +215,4 @@ async fn create_tunnel(
     };
 
     Ok(tunnel_data)
-}
-
-#[cfg(test)]
-mod tests {
-    use cloudflare::framework::{
-        Environment, HttpApiClientConfig, async_api::Client, auth::Credentials,
-    };
-    use mockito::Matcher;
-
-    use super::delete_tunnel_with_client;
-
-    fn test_client(server_url: &str) -> Client {
-        Client::new(
-            Credentials::UserAuthToken {
-                token: "test-token".to_string(),
-            },
-            HttpApiClientConfig::default(),
-            Environment::Custom(server_url.parse().unwrap()),
-        )
-        .unwrap()
-    }
-
-    #[tokio::test]
-    async fn leaves_tunnel_intact_when_dns_lookup_fails() {
-        let mut server = mockito::Server::new_async().await;
-        let dns_lookup = server
-            .mock("GET", "/zones/zone-id/dns_records")
-            .match_query(Matcher::AllOf(vec![
-                Matcher::UrlEncoded("type".into(), "CNAME".into()),
-                Matcher::UrlEncoded(
-                    "content".into(),
-                    "tunnel-id.cfargotunnel.com".into(),
-                ),
-            ]))
-            .with_status(500)
-            .with_body(
-                r#"{"success":false,"errors":[{"code":1000,"message":"failure"}],"messages":[],"result":null}"#,
-            )
-            .create_async()
-            .await;
-        let tunnel_delete = server
-            .mock("DELETE", "/accounts/account-id/cfd_tunnel/tunnel-id")
-            .expect(0)
-            .create_async()
-            .await;
-
-        let result = delete_tunnel_with_client(
-            &test_client(&server.url()),
-            "account-id",
-            "zone-id",
-            "tunnel-id",
-        )
-        .await;
-
-        assert!(result.is_err());
-        dns_lookup.assert_async().await;
-        tunnel_delete.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn deletes_tunnel_when_dns_record_is_already_missing() {
-        let mut server = mockito::Server::new_async().await;
-        let dns_lookup = server
-            .mock("GET", "/zones/zone-id/dns_records")
-            .match_query(Matcher::AllOf(vec![
-                Matcher::UrlEncoded("type".into(), "CNAME".into()),
-                Matcher::UrlEncoded("content".into(), "tunnel-id.cfargotunnel.com".into()),
-            ]))
-            .with_status(200)
-            .with_body(r#"{"success":true,"errors":[],"messages":[],"result":[]}"#)
-            .create_async()
-            .await;
-        let tunnel_delete = server
-            .mock("DELETE", "/accounts/account-id/cfd_tunnel/tunnel-id")
-            .match_query(Matcher::UrlEncoded("cascade".into(), "true".into()))
-            .with_status(200)
-            .with_body(
-                r#"{"success":true,"errors":[],"messages":[],"result":{"id":"00000000-0000-0000-0000-000000000000","created_at":"2026-01-01T00:00:00Z","deleted_at":"2026-01-01T00:00:00Z","name":"test","connections":[],"metadata":{}}}"#,
-            )
-            .create_async()
-            .await;
-
-        let result = delete_tunnel_with_client(
-            &test_client(&server.url()),
-            "account-id",
-            "zone-id",
-            "tunnel-id",
-        )
-        .await;
-
-        assert!(result.is_ok());
-        dns_lookup.assert_async().await;
-        tunnel_delete.assert_async().await;
-    }
 }

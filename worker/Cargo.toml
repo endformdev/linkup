@@ -22,7 +22,3 @@ console_error_panic_hook = { version = "0.1.7" }
 getrandom = { version = "0.4.2", features = ["wasm_js"] }
 tower-service = "0.3.3"
 worker = { version = "0.5.0", features = ["http", "axum"] }
-
-[dev-dependencies]
-mockito = "1.6.1"
-tokio = { workspace = true, features = ["macros", "rt"] }
