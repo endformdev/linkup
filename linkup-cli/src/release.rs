@@ -53,7 +53,7 @@ mod github {
                     "Linkup release for OS '{}' and ARCH '{}' not found on version {}",
                     lookup_os,
                     arch,
-                    &self.version
+                    self.version
                 );
             }
 

@@ -211,7 +211,7 @@ async fn create_tunnel(
     let tunnel_data = TunnelData {
         account_id: account_id.to_string(),
         name: tunnel_name.to_string(),
-        url: format!("https://{}.{}", &tunnel_name, &zone.name),
+        url: format!("https://{}.{}", tunnel_name, zone.name),
         id: tunnel.id.to_string(),
         secret: tunnel_secret,
         last_started: worker::Date::now().as_millis(),
