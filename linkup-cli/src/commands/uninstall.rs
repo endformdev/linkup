@@ -30,7 +30,7 @@ pub async fn uninstall(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
 
     let exe_path = linkup_exe_path()?;
 
-    log::debug!("Linkup exe path: {:?}", &exe_path);
+    log::debug!("Linkup exe path: {:?}", exe_path);
     match InstallationMethod::current()? {
         InstallationMethod::Brew => {
             log::debug!("Uninstalling linkup from Homebrew");
@@ -58,7 +58,7 @@ pub async fn uninstall(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
             #[cfg(target_os = "linux")]
             {
                 println!("Linkup needs sudo access to:");
-                println!("  - Remove binary from {:?}", &exe_path);
+                println!("  - Remove binary from {:?}", exe_path);
 
                 if !is_sudo() {
                     sudo_su()?;

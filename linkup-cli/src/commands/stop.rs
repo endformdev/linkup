@@ -50,7 +50,7 @@ fn remove_service_env(directory: String, config_path: String) -> Result<()> {
     let service_path = PathBuf::from(config_dir).join(&directory);
 
     let env_files: Vec<_> = fs::read_dir(&service_path)
-        .with_context(|| format!("Failed to read service directory {:?}", &service_path))?
+        .with_context(|| format!("Failed to read service directory {:?}", service_path))?
         .filter_map(Result::ok)
         .filter(|entry| entry.file_name().to_string_lossy().starts_with(".env"))
         .collect();
