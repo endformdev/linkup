@@ -1974,10 +1974,12 @@ dependencies = [
  "getrandom 0.4.2",
  "http",
  "linkup",
+ "mockito",
  "regex",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "tokio",
  "tower-service",
  "worker",
 ]
