@@ -58,7 +58,7 @@ jobs:
         working-directory: worker
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install -q worker-build@0.1.4
+          cargo install -q worker-build@0.8.7
           worker-build --release
 
       - name: Start Wrangler Worker
@@ -87,6 +87,6 @@ jobs:
       # TODO(augustoccesar)[2026-02-25]: From 0.7.0, the worker-build version is aligned
       #   with the version of the worker crate. When bumping the worker, it needs to also
       #   bump the worker-build.
-      - run: cargo install -q worker-build@0.1.4
+      - run: cargo install -q worker-build@0.8.7
       - run: worker-build --release
         working-directory: worker

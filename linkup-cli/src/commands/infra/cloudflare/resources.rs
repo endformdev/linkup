@@ -9,8 +9,8 @@ use crate::commands::infra::notifier::DeployNotifier;
 
 use super::{DeployError, api::CloudflareApi};
 
-const LINKUP_WORKER_SHIM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/shim.mjs"));
-const LINKUP_WORKER_INDEX_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/index.wasm"));
+const LINKUP_WORKER_INDEX_JS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/index.js"));
+const LINKUP_WORKER_INDEX_WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/index_bg.wasm"));
 
 #[derive(Debug, Clone)]
 pub struct TargetCfResources {
@@ -1097,15 +1097,15 @@ pub fn cf_resources(
         tunnel_zone_id: tunnel_zone_id.clone(),
         account_token_name,
         worker_script_name: linkup_script_name.clone(),
-        worker_script_entry: "shim.mjs".to_string(),
+        worker_script_entry: "index.js".to_string(),
         worker_script_parts: vec![
             WorkerScriptPart {
-                name: "shim.mjs".to_string(),
-                data: LINKUP_WORKER_SHIM.to_vec(),
+                name: "index.js".to_string(),
+                data: LINKUP_WORKER_INDEX_JS.to_vec(),
                 content_type: "application/javascript+module".to_string(),
             },
             WorkerScriptPart {
-                name: "index.wasm".to_string(),
+                name: "index_bg.wasm".to_string(),
                 data: LINKUP_WORKER_INDEX_WASM.to_vec(),
                 content_type: "application/wasm".to_string(),
             },
