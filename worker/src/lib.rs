@@ -30,7 +30,7 @@ async fn fetch(
     let state = WorkerState::load(env).await?;
 
     let url = worker::Url::parse(&req.url())?;
-    if url.path().starts_with("/linkup") {
+    if url.path().starts_with("/linkup/") {
         let req = HttpRequest::from_raw(req).map_err(to_worker_error)?;
         let response = router(state).call(req).await?;
 
