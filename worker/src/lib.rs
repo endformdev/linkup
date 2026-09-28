@@ -1,7 +1,10 @@
-use axum::{body::Body, response::Response};
+use axum::response::IntoResponse;
 use linkup::TunnelData;
 use tower_service::Service;
-use worker::{Env, HttpRequest, console_error, console_log, console_warn, event};
+use worker::{
+    Env, FromRequest, HttpRequest, console_error, console_log, console_warn, event,
+    worker_sys::web_sys,
+};
 
 use crate::{router::router, worker_state::WorkerState};
 
@@ -18,15 +21,38 @@ pub(crate) const MIN_SUPPORTED_CLIENT_VERSION: &str = "2.1.0";
 
 #[event(fetch)]
 async fn fetch(
-    req: HttpRequest,
+    req: web_sys::Request,
     env: Env,
     _ctx: worker::Context,
-) -> Result<Response<Body>, worker::Error> {
+) -> Result<web_sys::Response, worker::Error> {
     console_error_panic_hook::set_once();
 
     let state = WorkerState::load(env).await?;
 
-    Ok(router(state).call(req).await?)
+    let url = worker::Url::parse(&req.url())?;
+    if url.path().starts_with("/linkup/") {
+        let req = HttpRequest::from_raw(req).map_err(to_worker_error)?;
+        let response = router(state).call(req).await?;
+
+        return into_raw_response(response);
+    }
+
+    match handlers::proxy::handle_all(state, req.into()).await {
+        Ok(response) => Ok(response),
+        Err(error) => into_raw_response(error.into_response()),
+    }
+}
+
+pub(crate) fn into_raw_response(
+    response: impl worker::IntoResponse,
+) -> Result<web_sys::Response, worker::Error> {
+    worker::IntoResponse::into_raw(response).map_err(to_worker_error)
+}
+
+fn to_worker_error(error: impl Into<Box<dyn std::error::Error>>) -> worker::Error {
+    let error: Box<dyn std::error::Error> = error.into();
+
+    worker::Error::RustError(error.to_string())
 }
 
 #[event(scheduled)]
