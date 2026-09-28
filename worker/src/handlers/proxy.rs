@@ -64,8 +64,8 @@ pub async fn handle_all(
     let cacheable_req = is_cacheable_request(&upstream_request, &config);
     let cache_key = get_cache_key(&upstream_request, &session_name).unwrap_or_default();
 
-    if cacheable_req && let Some(upstream_response) = get_cached_req(cache_key.clone()).await {
-        return Ok(upstream_response.into());
+    if cacheable_req && let Some(cached_response) = get_cached_req(cache_key.clone()).await {
+        return Ok(with_cors(cached_response).into());
     }
 
     let mut upstream_response = match Fetch::Request(upstream_request).send().await {
@@ -107,12 +107,14 @@ pub async fn handle_all(
         }
     }
 
-    let mut response_headers: HeaderMap = upstream_response.headers().into();
+    Ok(with_cors(upstream_response).into())
+}
+
+fn with_cors(response: worker::Response) -> worker::Response {
+    let mut response_headers: HeaderMap = response.headers().into();
     response_headers.extend(linkup::allow_all_cors());
 
-    Ok(upstream_response
-        .with_headers((&response_headers).into())
-        .into())
+    response.with_headers((&response_headers).into())
 }
 
 fn is_cacheable_request(req: &worker::Request, config: &Session) -> bool {
