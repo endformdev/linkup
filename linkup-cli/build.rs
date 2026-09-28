@@ -12,9 +12,6 @@ fn main() {
     let worker_target_dir = Path::new(&out_dir).join("worker-target");
 
     let install_status = Command::new("cargo")
-        // TODO(augustoccesar)[2026-02-25]: From 0.7.0, the worker-build version is aligned
-        //   with the version of the worker crate. When bumping the worker, it needs to also
-        //   bump the worker-build.
         .args(["install", "-q", "worker-build@0.8.7"])
         .current_dir("../worker")
         .env("CARGO_TARGET_DIR", &worker_target_dir)
