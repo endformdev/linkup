@@ -3,7 +3,7 @@ use axum::{
     extract::{Request, State},
     middleware::{Next, from_fn_with_state},
     response::IntoResponse,
-    routing::{any, get, post},
+    routing::{get, post},
 };
 use http::{HeaderMap, StatusCode};
 use linkup::{Version, VersionChannel};
@@ -39,10 +39,6 @@ pub fn router(state: WorkerState) -> Router {
             post(handlers::v2::sessions::upsert_tunneled),
         )
         .route_layer(from_fn_with_state(state.clone(), authenticate))
-        // ----------------------------------------------------------------------------------------
-        // --- Fallback
-        // ----------------------------------------------------------------------------------------
-        .fallback(any(handlers::proxy::handle_all))
         .with_state(state)
 }
 

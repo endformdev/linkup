@@ -1,61 +1,63 @@
-use axum::{
-    extract::{Request, State},
-    response::IntoResponse,
-};
-use http::{HeaderMap, StatusCode, Uri};
+use axum::response::IntoResponse;
+use http::{HeaderMap, StatusCode};
 use linkup::{Session, get_additional_headers, get_target_service};
-use worker::{Fetch, HttpResponse};
+use worker::{Fetch, RequestInit, wasm_bindgen::JsValue, worker_sys::web_sys};
 
 use crate::{http_error::HttpError, worker_state::WorkerState, ws::handle_ws_resp};
 
-#[worker::send]
-pub async fn handle_all(State(state): State<WorkerState>, mut req: Request) -> impl IntoResponse {
-    let headers: linkup::HeaderMap = req.headers().into();
-    let url = req.uri().to_string();
+pub async fn handle_all(
+    state: WorkerState,
+    req: worker::Request,
+) -> Result<web_sys::Response, HttpError> {
+    let mut request_headers: HeaderMap = req.headers().into();
+    let headers: linkup::HeaderMap = (&request_headers).into();
+    let url = req.inner().url();
     let (session_name, config) = match state.session_allocator.get_request_session(&url, &headers).await {
         Ok(session) => session,
         Err(_) => {
-            return HttpError::new(
+            return Err(HttpError::new(
                 "Linkup was unable to determine the session origin of the request.\nMake sure your request includes a valid session ID in the referer or tracestate headers. - Worker".to_string(),
                 StatusCode::UNPROCESSABLE_ENTITY,
-            )
-            .into_response()
+            ))
         }
     };
 
     let target_service = match get_target_service(&url, &headers, &config, &session_name) {
         Some(result) => result,
         None => {
-            return HttpError::new(
+            return Err(HttpError::new(
                 "The request belonged to a session, but there was no target for the request.\nCheck your routing rules in the linkup config for a match. - Worker".to_string(),
                 StatusCode::NOT_FOUND,
-            )
-            .into_response()
+            ))
         }
     };
 
     let extra_headers = get_additional_headers(&url, &headers, &session_name, &target_service);
-    let is_websocket = req
-        .headers()
+    let is_websocket = request_headers
         .get("upgrade")
         .map(|v| v == "websocket")
         .unwrap_or(false);
 
     // Rewrite request for the target service
-    *req.uri_mut() = Uri::try_from(target_service.url).unwrap();
     let extra_http_headers: HeaderMap = extra_headers.into();
-    req.headers_mut().extend(extra_http_headers);
-    req.headers_mut().remove(http::header::HOST);
-    linkup::normalize_cookie_header(req.headers_mut());
+    request_headers.extend(extra_http_headers);
+    request_headers.remove(http::header::HOST);
+    linkup::normalize_cookie_header(&mut request_headers);
 
-    let upstream_request: worker::Request = match req.try_into() {
+    let mut upstream_init = RequestInit::new();
+    upstream_init
+        .with_method(req.method())
+        .with_headers((&request_headers).into())
+        .with_body(req.inner().body().map(JsValue::from));
+
+    let upstream_request = match worker::Request::new_with_init(&target_service.url, &upstream_init)
+    {
         Ok(req) => req,
         Err(e) => {
-            return HttpError::new(
+            return Err(HttpError::new(
                 format!("Failed to parse request: {}", e),
                 StatusCode::BAD_REQUEST,
-            )
-            .into_response();
+            ));
         }
     };
 
@@ -63,57 +65,54 @@ pub async fn handle_all(State(state): State<WorkerState>, mut req: Request) -> i
     let cache_key = get_cache_key(&upstream_request, &session_name).unwrap_or_default();
 
     if cacheable_req && let Some(upstream_response) = get_cached_req(cache_key.clone()).await {
-        let resp: HttpResponse = match upstream_response.try_into() {
-            Ok(resp) => resp,
-            Err(e) => {
-                return HttpError::new(
-                    format!("Failed to parse cached response: {}", e),
-                    StatusCode::BAD_GATEWAY,
-                )
-                .into_response();
-            }
-        };
-
-        return resp.into_response();
+        return Ok(upstream_response.into());
     }
 
     let mut upstream_response = match Fetch::Request(upstream_request).send().await {
         Ok(resp) => resp,
         Err(e) => {
-            return HttpError::new(
+            return Err(HttpError::new(
                 format!("Failed to fetch from target service: {}", e),
                 StatusCode::BAD_GATEWAY,
-            )
-            .into_response();
+            ));
         }
     };
 
     if is_websocket {
-        handle_ws_resp(upstream_response).await.into_response()
-    } else {
-        if cacheable_req {
-            let cache_clone = match upstream_response.cloned() {
-                Ok(resp) => resp,
-                Err(e) => {
-                    return HttpError::new(
-                        format!("Failed to clone response: {}", e),
-                        StatusCode::BAD_GATEWAY,
-                    )
-                    .into_response();
-                }
-            };
-
-            if let Err(e) = set_cached_req(cache_key, cache_clone).await {
-                return HttpError::new(
-                    format!("Failed to cache response: {}", e),
+        return crate::into_raw_response(handle_ws_resp(upstream_response).await.into_response())
+            .map_err(|e| {
+                HttpError::new(
+                    format!("Failed to create websocket response: {}", e),
                     StatusCode::INTERNAL_SERVER_ERROR,
                 )
-                .into_response();
-            }
-        }
-
-        handle_http_resp(upstream_response).await.into_response()
+            });
     }
+
+    if cacheable_req {
+        let cache_clone = match upstream_response.cloned() {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(HttpError::new(
+                    format!("Failed to clone response: {}", e),
+                    StatusCode::BAD_GATEWAY,
+                ));
+            }
+        };
+
+        if let Err(e) = set_cached_req(cache_key, cache_clone).await {
+            return Err(HttpError::new(
+                format!("Failed to cache response: {}", e),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ));
+        }
+    }
+
+    let mut response_headers: HeaderMap = upstream_response.headers().into();
+    response_headers.extend(linkup::allow_all_cors());
+
+    Ok(upstream_response
+        .with_headers((&response_headers).into())
+        .into())
 }
 
 fn is_cacheable_request(req: &worker::Request, config: &Session) -> bool {
@@ -155,19 +154,4 @@ async fn set_cached_req(cache_key: String, resp: worker::Response) -> worker::Re
     }
     worker::Cache::default().put(cache_key, resp).await?;
     Ok(())
-}
-
-async fn handle_http_resp(worker_resp: worker::Response) -> impl IntoResponse {
-    let mut resp: HttpResponse = match worker_resp.try_into() {
-        Ok(resp) => resp,
-        Err(e) => {
-            return HttpError::new(
-                format!("Failed to parse response: {}", e),
-                StatusCode::BAD_GATEWAY,
-            )
-            .into_response();
-        }
-    };
-    resp.headers_mut().extend(linkup::allow_all_cors());
-    resp.into_response()
 }
