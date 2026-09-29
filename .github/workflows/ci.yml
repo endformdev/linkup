@@ -20,9 +20,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
       # Create empty worker build artifacts
-      - run: mkdir -p worker/build/worker
-      - run: touch worker/build/worker/shim.mjs
-      - run: touch worker/build/worker/index.wasm
+      - run: mkdir -p worker/build
+      - run: touch worker/build/index.js
+      - run: touch worker/build/index_bg.wasm
       - run: cargo check --all
       - run: rustup component add clippy
       - run: cargo clippy

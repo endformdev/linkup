@@ -1,7 +1,7 @@
 use axum::response::IntoResponse;
 use http::{HeaderMap, StatusCode};
 use linkup::{Session, get_additional_headers, get_target_service};
-use worker::{Fetch, RequestInit, wasm_bindgen::JsValue, worker_sys::web_sys};
+use worker::{Fetch, RequestInit, RequestRedirect, wasm_bindgen::JsValue, worker_sys::web_sys};
 
 use crate::{http_error::HttpError, worker_state::WorkerState, ws::handle_ws_resp};
 
@@ -47,6 +47,8 @@ pub async fn handle_all(
     let mut upstream_init = RequestInit::new();
     upstream_init
         .with_method(req.method())
+        // Return redirects and their cookies to the browser, including OAuth callbacks.
+        .with_redirect(RequestRedirect::Manual)
         .with_headers((&request_headers).into())
         .with_body(req.inner().body().map(JsValue::from));
 
