@@ -6,7 +6,7 @@ use axum::{
 use http::{StatusCode, header::SET_COOKIE};
 use tokio::net::TcpListener;
 
-use crate::helpers::{ServerKind, seed_session, setup_server};
+use crate::helpers::{ServerKind, create_session_request, post, seed_session, setup_server};
 
 mod helpers;
 
@@ -83,9 +83,56 @@ async fn maintains_multiple_set_cookie_headers() {
     assert_eq!(cookies[1].to_str().unwrap(), "cookie2=value2; Path=/");
 }
 
+#[tokio::test]
+#[ignore = "requires running wrangler dev"]
+async fn worker_preserves_redirect_and_cookies() {
+    let (url, _) = setup_server(ServerKind::Worker).await;
+    let underlying_url = setup_underlying_server("redirect was followed".to_string()).await;
+    let session_name = "redirectcookies";
+    let response = post(
+        format!("{}/linkup/local-session", url),
+        create_session_request(session_name.to_string(), Some(underlying_url)),
+    )
+    .await;
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let response = get_session(
+        format!("{}/oauth-callback", url),
+        "example.com".to_string(),
+        session_name.to_string(),
+    )
+    .await;
+    assert_eq!(response.status(), reqwest::StatusCode::SEE_OTHER);
+    assert_eq!(response.headers().get("location").unwrap(), "/signed-in");
+    let cookies: Vec<_> = response.headers().get_all(SET_COOKIE).iter().collect();
+    assert_eq!(cookies.len(), 2);
+    assert!(
+        cookies
+            .iter()
+            .any(|value| *value == "session=authenticated; Path=/; HttpOnly")
+    );
+    assert!(
+        cookies
+            .iter()
+            .any(|value| *value == "oauth_state=; Path=/; Max-Age=0")
+    );
+}
+
 async fn setup_underlying_server(name: String) -> String {
     let app = Router::new()
         .route("/redirect", get(Redirect::temporary("/somethingelse")))
+        .route(
+            "/oauth-callback",
+            get(|| async {
+                (
+                    AppendHeaders([
+                        (SET_COOKIE, "session=authenticated; Path=/; HttpOnly"),
+                        (SET_COOKIE, "oauth_state=; Path=/; Max-Age=0"),
+                    ]),
+                    Redirect::to("/signed-in"),
+                )
+            }),
+        )
         .route(
             "/cookies",
             get(|| async {
