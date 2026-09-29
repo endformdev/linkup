@@ -1,5 +1,5 @@
 name = "linkup-worker"
-main = "build/worker/shim.mjs"
+main = "build/index.js"
 compatibility_date = "2024-05-30"
 
 kv_namespaces = [
