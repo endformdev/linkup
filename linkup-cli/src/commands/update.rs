@@ -2,7 +2,7 @@ use anyhow::Context;
 #[cfg(not(target_os = "linux"))]
 use std::fs;
 
-use crate::{InstallationMethod, Result, commands, current_version, linkup_exe_path, release};
+use crate::{Result, commands, current_version, linkup_exe_path, release};
 
 #[cfg(target_os = "linux")]
 use crate::{is_sudo, sudo_su};
@@ -139,11 +139,4 @@ pub async fn new_version_available() -> bool {
     release::check_for_update(&current_version(), None)
         .await
         .is_some()
-}
-
-pub fn update_command() -> Result<String> {
-    match InstallationMethod::current()? {
-        InstallationMethod::Brew => Ok("brew upgrade linkup".to_string()),
-        InstallationMethod::Manual | InstallationMethod::Cargo => Ok("linkup update".to_string()),
-    }
 }

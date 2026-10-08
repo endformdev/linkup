@@ -22,7 +22,6 @@ const LINKUP_DIR: &str = ".linkup";
 const LINKUP_STATE_FILE: &str = "state";
 
 pub enum InstallationMethod {
-    Brew,
     Cargo,
     Manual,
 }
@@ -30,9 +29,7 @@ pub enum InstallationMethod {
 impl InstallationMethod {
     fn current() -> Result<Self> {
         for component in linkup_exe_path()?.components() {
-            if component.as_os_str() == "Cellar" {
-                return Ok(Self::Brew);
-            } else if component.as_os_str() == ".cargo" {
+            if component.as_os_str() == ".cargo" {
                 return Ok(Self::Cargo);
             }
         }
@@ -150,22 +147,10 @@ async fn display_update_message(command: &Commands) {
     };
 
     if commands::update::new_version_available().await {
-        match commands::update::update_command() {
-            Ok(update_command) => {
-                let message = format!(
-                    "⚠️ New version of linkup is available! Run `{update_command}` to update it.\n"
-                )
-                .yellow();
+        let message =
+            "⚠️ New version of linkup is available! Run `linkup update` to update it.\n".yellow();
 
-                println!("{}", message);
-            }
-            Err(error) => {
-                // TODO(augustoccesar)[2025-03-26]: This should probably be an error log, but for now since the logs
-                //   are not behaving the way that we want them to, keep as a warning. Will revisit this once starts
-                //   looking into tracing.
-                log::warn!("Failed to resolve the update command to display to user: {error}");
-            }
-        }
+        println!("{}", message);
     }
 }
 

@@ -32,16 +32,6 @@ pub async fn uninstall(_args: &Args, config_arg: Option<&Path>) -> Result<()> {
 
     log::debug!("Linkup exe path: {:?}", exe_path);
     match InstallationMethod::current()? {
-        InstallationMethod::Brew => {
-            log::debug!("Uninstalling linkup from Homebrew");
-
-            process::Command::new("brew")
-                .args(["uninstall", "linkup"])
-                .stdin(process::Stdio::null())
-                .stdout(process::Stdio::null())
-                .stderr(process::Stdio::null())
-                .status()?;
-        }
         InstallationMethod::Cargo => {
             log::debug!("Uninstalling linkup from Cargo");
 

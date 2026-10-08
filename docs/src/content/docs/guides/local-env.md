@@ -19,13 +19,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/mentimete
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/mentimeter/linkup/refs/heads/main/linkup-cli/install.sh | bash -s -- --channel beta
 ```
 
-### With Homebrew
-
-```sh
-brew tap mentimeter/mentimeter
-brew install linkup
-```
-
 ## Basic workflow
 
 ```sh
