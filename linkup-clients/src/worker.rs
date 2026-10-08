@@ -1,4 +1,6 @@
-use linkup::{SessionResponse, TunneledSessionResponse, UpsertSessionRequest};
+use std::time::Duration;
+
+use linkup::{SessionResponse, TunneledSessionResponse, UpsertSessionRequest, Version};
 use reqwest::{StatusCode, header};
 use serde::{Serialize, de::DeserializeOwned};
 use url::Url;
@@ -13,6 +15,16 @@ pub enum Error {
     Serde(#[from] serde_json::Error),
     #[error("request failed with status {0}: {1}")]
     Response(StatusCode, String),
+    #[error("{0}")]
+    InvalidVersion(#[from] linkup::VersionError),
+    #[error(
+        "Your Linkup worker ({worker_version}) doesn't support {feature}, which needs version {required_version} or newer. Ask your admin to run `linkup infra deploy`."
+    )]
+    UnsupportedByWorker {
+        feature: String,
+        required_version: Version,
+        worker_version: Version,
+    },
 }
 
 #[derive(Clone)]
@@ -44,6 +56,46 @@ impl WorkerClient {
             url: url.clone(),
             inner: client,
         }
+    }
+
+    /// Version of the deployed worker. Workers deployed before the version header was added don't
+    /// send it, so they are reported as the last version without it.
+    pub async fn version(&self) -> Result<Version, Error> {
+        let response = self
+            .inner
+            .get(self.url.join("/linkup/check")?)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await?;
+
+        let version = match response.headers().get("x-linkup-worker-version") {
+            Some(value) => Version::try_from(value.to_str().unwrap_or_default())?,
+            None => Version::try_from(LAST_VERSION_WITHOUT_HEADER)?,
+        };
+
+        Ok(version)
+    }
+
+    /// Fails if the worker is older than `required_version`. New CLI features that rely on new
+    /// worker functionality should call this first, so older workers get a clear error instead of
+    /// an unexpected response.
+    pub async fn require_version(
+        &self,
+        required_version: &str,
+        feature: &str,
+    ) -> Result<(), Error> {
+        let required_version = Version::try_from(required_version)?;
+        let worker_version = self.version().await?;
+
+        if worker_version < required_version {
+            return Err(Error::UnsupportedByWorker {
+                feature: feature.to_string(),
+                required_version,
+                worker_version,
+            });
+        }
+
+        Ok(())
     }
 
     pub async fn tunneled_session(
@@ -90,3 +142,4 @@ impl WorkerClient {
 }
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+const LAST_VERSION_WITHOUT_HEADER: &str = "4.1.1";

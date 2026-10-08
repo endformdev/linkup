@@ -39,6 +39,19 @@ async fn worker_can_respond_to_health_check() {
 
 #[tokio::test]
 #[ignore = "requires running wrangler dev"]
+async fn worker_reports_its_version() {
+    let (url, _) = setup_server(ServerKind::Worker).await;
+
+    let response = get(format!("{}/linkup/check", url)).await;
+
+    assert_eq!(
+        response.headers().get("x-linkup-worker-version").unwrap(),
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires running wrangler dev"]
 async fn worker_no_such_session() {
     let (url, _) = setup_server(ServerKind::Worker).await;
 

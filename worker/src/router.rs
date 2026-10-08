@@ -1,11 +1,11 @@
 use axum::{
     Router,
     extract::{Request, State},
-    middleware::{Next, from_fn_with_state},
-    response::IntoResponse,
+    middleware::{Next, from_fn_with_state, map_response},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
-use http::{HeaderMap, StatusCode};
+use http::{HeaderMap, HeaderValue, StatusCode};
 use linkup::{Version, VersionChannel};
 use worker::console_warn;
 
@@ -39,7 +39,19 @@ pub fn router(state: WorkerState) -> Router {
             post(handlers::v2::sessions::upsert_tunneled),
         )
         .route_layer(from_fn_with_state(state.clone(), authenticate))
+        .layer(map_response(add_worker_version))
         .with_state(state)
+}
+
+/// Lets the CLI know which version of the worker it is talking to, so it can avoid using features
+/// or updating to versions that this worker doesn't support.
+async fn add_worker_version(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        "x-linkup-worker-version",
+        HeaderValue::from_static(env!("CARGO_PKG_VERSION")),
+    );
+
+    response
 }
 
 async fn no_tunnel() -> impl IntoResponse {

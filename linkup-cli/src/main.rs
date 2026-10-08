@@ -146,12 +146,18 @@ async fn display_update_message(command: &Commands) {
         _ => (),
     };
 
-    if commands::update::new_version_available().await {
-        let message =
-            "⚠️ New version of linkup is available! Run `linkup update` to update it.\n".yellow();
+    let message = match commands::update::available_update().await {
+        Some(release::Update::Available(_)) => {
+            "⚠️ New version of linkup is available! Run `linkup update` to update it.".to_string()
+        }
+        Some(release::Update::RequiresWorkerUpdate { release, .. }) => format!(
+            "⚠️ Linkup {} is available, but your Linkup worker needs to be updated first. Ask your admin to run `linkup infra deploy`.",
+            release.version
+        ),
+        None => return,
+    };
 
-        println!("{}", message);
-    }
+    println!("{}\n", message.yellow());
 }
 
 #[derive(Error, Debug)]

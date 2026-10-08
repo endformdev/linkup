@@ -116,26 +116,12 @@ mod github {
         }
     }
 
-    pub(super) async fn fetch_stable_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/endformdev/linkup/releases/latest"
+    pub(super) async fn fetch_releases() -> Result<Vec<Release>, Error> {
+        let url: Url = "https://api.github.com/repos/endformdev/linkup/releases?per_page=100"
             .parse()
             .expect("GitHub URL to be correct");
 
-        fetch(url).await
-    }
-
-    pub(super) async fn fetch_beta_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/endformdev/linkup/releases"
-            .parse()
-            .expect("GitHub URL to be correct");
-
-        let releases: Vec<Release> = fetch(url).await?.unwrap_or_default();
-
-        let beta_release = releases
-            .into_iter()
-            .find(|release| release.version.starts_with("0.0.0-next-"));
-
-        Ok(beta_release)
+        Ok(fetch(url).await?.unwrap_or_default())
     }
 
     async fn fetch<T>(url: Url) -> Result<Option<T>, Error>
@@ -181,13 +167,14 @@ mod github {
     }
 }
 
-use std::path::PathBuf;
+use std::{cmp::Ordering, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::linkup_file_path;
+use crate::{linkup_file_path, state::State};
 use github::Asset;
 use linkup::{Version, VersionChannel};
+use linkup_clients::WorkerClient;
 
 const CACHE_FILE_NAME: &str = "releases_cache.json";
 
@@ -214,11 +201,22 @@ impl Release {
     }
 }
 
+pub enum Update {
+    Available(Release),
+    /// There is a newer release, but it's not supported by the deployed worker.
+    RequiresWorkerUpdate {
+        release: Release,
+        worker_version: Version,
+    },
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct CachedReleases {
     fetched_at: u64,
     next_fetch_at: u64,
     releases: Vec<Release>,
+    #[serde(default)]
+    worker_version: Option<Version>,
 }
 
 impl CachedReleases {
@@ -227,6 +225,7 @@ impl CachedReleases {
             fetched_at: now(),
             next_fetch_at: retry_at,
             releases: Vec::default(),
+            worker_version: None,
         }
     }
 
@@ -296,83 +295,113 @@ impl CachedReleases {
             log::debug!("failed to delete cached latest release file: {}", error);
         }
     }
-
-    fn get_release(&self, channel: &VersionChannel) -> Option<&Release> {
-        self.releases
-            .iter()
-            .find(|update| &update.channel == channel)
-    }
 }
 
 async fn fetch_releases(os: &str, arch: &str) -> Result<Vec<Release>, github::Error> {
-    // TODO: Could we maybe do a single request to GH to list the releases and do the filtering
-    //       locally?
-    let mut releases = Vec::<Release>::with_capacity(2);
-
-    if let Some(stable) = github::fetch_stable_release()
+    let releases = github::fetch_releases()
         .await?
-        .and_then(|gh_release| Release::from_github_release(&gh_release, os, arch))
-    {
-        releases.push(stable);
-    }
-
-    if let Some(beta) = github::fetch_beta_release()
-        .await?
-        .and_then(|gh_release| Release::from_github_release(&gh_release, os, arch))
-    {
-        releases.push(beta);
-    }
+        .iter()
+        .filter_map(|gh_release| Release::from_github_release(gh_release, os, arch))
+        .collect();
 
     Ok(releases)
 }
 
+async fn fetch_worker_version() -> Option<Version> {
+    let state = State::load().ok()?;
+    let worker = WorkerClient::new(&state.linkup.worker_url, &state.linkup.worker_token);
+
+    match worker.version().await {
+        Ok(version) => Some(version),
+        Err(error) => {
+            log::debug!("Failed to fetch the worker version: {}", error);
+
+            None
+        }
+    }
+}
+
+async fn load_or_fetch_releases() -> CachedReleases {
+    if let Some(cached_releases) = CachedReleases::load() {
+        return cached_releases;
+    }
+
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+
+    let cache = match fetch_releases(os, arch).await {
+        Ok(releases) => CachedReleases {
+            fetched_at: now(),
+            next_fetch_at: next_morning_utc_seconds(),
+            releases,
+            worker_version: fetch_worker_version().await,
+        },
+        Err(github::Error::RateLimit(retry_at)) => CachedReleases::empty_with_retry(retry_at),
+        Err(_) => CachedReleases::empty_with_retry(next_morning_utc_seconds()),
+    };
+
+    cache.save();
+
+    cache
+}
+
+/// Look for a newer release on the channel. Stable releases are only offered if they have the
+/// same major version as the deployed worker, unless `ignore_worker` is set. If the worker version
+/// is unknown, the newest release is offered.
 pub async fn check_for_update(
     current_version: &Version,
     channel: Option<VersionChannel>,
-) -> Option<Release> {
+    ignore_worker: bool,
+) -> Option<Update> {
     let channel = channel.unwrap_or_else(|| current_version.channel());
     log::debug!("Looking for available update on '{channel}' channel.");
 
-    let cached_releases = CachedReleases::load();
-    let release = match cached_releases {
-        Some(cached_releases) => cached_releases.get_release(&channel).cloned(),
-        None => {
-            let os = std::env::consts::OS;
-            let arch = std::env::consts::ARCH;
+    let cache = load_or_fetch_releases().await;
+    let worker_version = cache.worker_version.as_ref().filter(|_| !ignore_worker);
 
-            let new_cache = match fetch_releases(os, arch).await {
-                Ok(releases) => {
-                    let cache = CachedReleases {
-                        fetched_at: now(),
-                        next_fetch_at: next_morning_utc_seconds(),
-                        releases,
-                    };
+    select_update(&cache.releases, current_version, &channel, worker_version)
+}
 
-                    cache.save();
+fn select_update(
+    releases: &[Release],
+    current_version: &Version,
+    channel: &VersionChannel,
+    worker_version: Option<&Version>,
+) -> Option<Update> {
+    let newer_releases: Vec<&Release> = releases
+        .iter()
+        .filter(|release| &release.channel == channel)
+        .filter(|release| {
+            channel != &current_version.channel() || &release.version > current_version
+        })
+        .collect();
 
-                    cache
-                }
-                Err(error) => {
-                    let cache = match error {
-                        github::Error::RateLimit(retry_at) => {
-                            CachedReleases::empty_with_retry(retry_at)
-                        }
-                        _ => CachedReleases::empty_with_retry(next_morning_utc_seconds()),
-                    };
-
-                    cache.save();
-
-                    cache
-                }
-            };
-
-            new_cache.get_release(&channel).cloned()
-        }
+    let newest = |releases: Vec<&Release>| {
+        releases
+            .into_iter()
+            .max_by(|a, b| a.version.partial_cmp(&b.version).unwrap_or(Ordering::Equal))
+            .cloned()
     };
 
-    release.filter(|release| {
-        channel != current_version.channel() || &release.version > current_version
-    })
+    // Beta releases are not versioned against the worker, so they are always offered.
+    let worker_version = match worker_version {
+        Some(worker_version) if channel == &VersionChannel::Stable => worker_version,
+        _ => return newest(newer_releases).map(Update::Available),
+    };
+
+    let supported_releases = newer_releases
+        .iter()
+        .copied()
+        .filter(|release| release.version.major == worker_version.major)
+        .collect();
+
+    match newest(supported_releases) {
+        Some(release) => Some(Update::Available(release)),
+        None => newest(newer_releases).map(|release| Update::RequiresWorkerUpdate {
+            release,
+            worker_version: worker_version.clone(),
+        }),
+    }
 }
 
 fn now() -> u64 {
@@ -389,4 +418,100 @@ fn next_morning_utc_seconds() -> u64 {
     let seconds_since_midnight = now_in_seconds % seconds_in_day;
 
     now_in_seconds + (seconds_in_day - seconds_since_midnight)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn offers_newest_release_when_worker_version_is_unknown() {
+        let update = select(&["4.1.1", "4.2.0", "5.0.0"], "4.1.1", None);
+
+        assert_eq!(available_version(update), Some("5.0.0".to_string()));
+    }
+
+    #[test]
+    fn offers_newest_release_with_same_major_as_worker() {
+        let update = select(
+            &["4.1.1", "4.2.0", "4.3.0", "5.0.0"],
+            "4.1.1",
+            Some("4.2.0"),
+        );
+
+        assert_eq!(available_version(update), Some("4.3.0".to_string()));
+    }
+
+    #[test]
+    fn requires_worker_update_when_only_newer_majors_exist() {
+        let update = select(&["4.2.0", "5.0.0", "5.1.0"], "4.2.0", Some("4.2.0"));
+
+        match update {
+            Some(Update::RequiresWorkerUpdate {
+                release,
+                worker_version,
+            }) => {
+                assert_eq!(release.version.to_string(), "5.1.0");
+                assert_eq!(worker_version.to_string(), "4.2.0");
+            }
+            _ => panic!("expected an update that requires a worker update"),
+        }
+    }
+
+    #[test]
+    fn offers_newer_major_once_worker_is_updated() {
+        let update = select(&["4.2.0", "5.0.0"], "4.2.0", Some("5.0.0"));
+
+        assert_eq!(available_version(update), Some("5.0.0".to_string()));
+    }
+
+    #[test]
+    fn offers_nothing_when_already_on_newest_release() {
+        let update = select(&["4.1.1", "4.2.0"], "4.2.0", Some("4.2.0"));
+
+        assert!(update.is_none());
+    }
+
+    #[test]
+    fn ignores_worker_version_for_beta_releases() {
+        let update = select(
+            &["0.0.0-next-202610010000-abc", "0.0.0-next-202610020000-def"],
+            "0.0.0-next-202610010000-abc",
+            Some("4.2.0"),
+        );
+
+        assert_eq!(
+            available_version(update),
+            Some("0.0.0-next-202610020000-def".to_string())
+        );
+    }
+
+    fn release(version: &str) -> Release {
+        let version = Version::try_from(version).unwrap();
+
+        Release {
+            channel: version.channel(),
+            binary: serde_json::from_value(serde_json::json!({
+                "name": format!("linkup-{version}-aarch64-apple-darwin.tar.gz"),
+                "browser_download_url": "https://example.com",
+            }))
+            .unwrap(),
+            version,
+        }
+    }
+
+    fn select(releases: &[&str], current: &str, worker: Option<&str>) -> Option<Update> {
+        let releases: Vec<Release> = releases.iter().map(|version| release(version)).collect();
+        let current = Version::try_from(current).unwrap();
+        let worker = worker.map(|version| Version::try_from(version).unwrap());
+
+        select_update(&releases, &current, &current.channel(), worker.as_ref())
+    }
+
+    fn available_version(update: Option<Update>) -> Option<String> {
+        match update {
+            Some(Update::Available(release)) => Some(release.version.to_string()),
+            _ => None,
+        }
+    }
 }

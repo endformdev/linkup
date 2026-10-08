@@ -2,7 +2,10 @@ use anyhow::Context;
 #[cfg(not(target_os = "linux"))]
 use std::fs;
 
-use crate::{Result, commands, current_version, linkup_exe_path, release};
+use crate::{
+    Result, commands, current_version, linkup_exe_path,
+    release::{self, Update},
+};
 
 #[cfg(target_os = "linux")]
 use crate::{is_sudo, sudo_su};
@@ -16,6 +19,11 @@ pub struct Args {
     /// Which channel to update to/with.
     #[arg(long)]
     channel: Option<DesiredChannel>,
+
+    /// Update to the newest version even if your Linkup worker doesn't support it yet. Useful when
+    /// you need the new version to deploy the worker with `linkup infra deploy`.
+    #[arg(long)]
+    force: bool,
 }
 
 #[derive(Clone, clap::ValueEnum)]
@@ -44,8 +52,8 @@ pub async fn update(args: &Args) -> Result<()> {
 
     let requested_channel = args.channel.as_ref().map(linkup::VersionChannel::from);
 
-    match release::check_for_update(&current_version, requested_channel).await {
-        Some(update) => {
+    match release::check_for_update(&current_version, requested_channel, args.force).await {
+        Some(Update::Available(update)) => {
             commands::stop(&commands::StopArgs {}, false)?;
 
             println!(
@@ -127,6 +135,18 @@ pub async fn update(args: &Args) -> Result<()> {
 
             println!("Finished update!");
         }
+        Some(Update::RequiresWorkerUpdate {
+            release,
+            worker_version,
+        }) => {
+            println!(
+                "Linkup {} is available, but your Linkup worker ({}) needs to be updated first.",
+                release.version, worker_version
+            );
+            println!(
+                "Ask your admin to run `linkup infra deploy`, or run `linkup update --force` to update anyway."
+            );
+        }
         None => {
             println!("No new version available.");
         }
@@ -135,8 +155,6 @@ pub async fn update(args: &Args) -> Result<()> {
     Ok(())
 }
 
-pub async fn new_version_available() -> bool {
-    release::check_for_update(&current_version(), None)
-        .await
-        .is_some()
+pub async fn available_update() -> Option<Update> {
+    release::check_for_update(&current_version(), None, false).await
 }
