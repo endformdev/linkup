@@ -45,7 +45,11 @@ mod github {
             let asset = self
                 .assets
                 .iter()
-                .find(|asset| asset.name.contains(lookup_os) && asset.name.contains(arch))
+                .find(|asset| {
+                    asset.name.contains(lookup_os)
+                        && asset.name.contains(arch)
+                        && asset.name.ends_with(".tar.gz")
+                })
                 .cloned();
 
             if asset.is_none() {
