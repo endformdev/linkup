@@ -1,7 +1,4 @@
----
-title: Deploy Linkup to Cloudflare
-description: Deploy the remote linkup worker to a Cloudflare domain
----
+# Deploy Linkup to Cloudflare
 
 ## Prerequisites
 
@@ -94,3 +91,7 @@ linkup infra \
   --zone-ids <zone-id> \
   destroy
 ```
+
+---
+
+← [What is Linkup?](../explanation/what-is-linkup.md) · [Docs home](../README.md) · [Run a Local Session](local-env.md) →

@@ -1,7 +1,4 @@
----
-title: Managing Sessions
-description: Understand session types and how to manage them with the Linkup CLI
----
+# Managing Sessions
 
 A Linkup _session_ is a unique view of your services: a name like `slim-gecko`
 plus a configuration that says, for each service, whether traffic should go to a
@@ -43,7 +40,7 @@ linkup route local web  # Route `web` traffic to your local dev server
 linkup status           # Check which services are where
 ```
 
-[Local DNS](/linkup/guides/local-dns) is optional here. Installing it makes
+[Local DNS](local-dns.md) is optional here. Installing it makes
 requests that originate on your machine skip Cloudflare and resolve directly to
 the local server, which is a significant speedup for asset-heavy frontends.
 
@@ -55,7 +52,7 @@ everything else. The session lives in Cloudflare with no local server or tunnel
 involved, so it stays up as long as the underlying services do. This is the
 session type to use for sharing a build with teammates or for CI/CD checks.
 
-See [Preview Environments](/linkup/guides/preview-env) for a full guide.
+See [Preview Environments](preview-env.md) for a full guide.
 
 ## Listing Sessions
 
@@ -96,3 +93,7 @@ actively use are not affected.
 
 This only applies to tunneled sessions. Preview sessions live in the worker
 independently and are not subject to this cleanup.
+
+---
+
+← [Run a Local Session](local-env.md) · [Docs home](../README.md) · [Preview Environments](preview-env.md) →

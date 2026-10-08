@@ -1,7 +1,4 @@
----
-title: How does Linkup work?
-description: How to configure services to work with Linkup
----
+# How does Linkup work?
 
 To grasp how linkup works, three core concepts matter:
 
@@ -159,3 +156,7 @@ local DNS mode. Local DNS resolves your application's domains directly to
 servers running on your local machine, so requests that could have been handled
 locally don't go over the public internet. Linkup also manages the TLS
 certificates for those local domains so HTTPS works without browser warnings.
+
+---
+
+← [What does a setup look like?](what-does-a-setup-look-like.md) · [Docs home](../README.md) · [Config Reference](../reference/config.md) →

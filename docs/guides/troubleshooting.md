@@ -1,7 +1,4 @@
----
-title: Troubleshooting
-description: How to troubleshoot common issues with Linkup
----
+# Troubleshooting
 
 ## linkup health
 
@@ -121,7 +118,7 @@ rejected. Common causes:
   `-H "tracestate: linkup-session=<your-session>"` to test.
 - A backend service is calling another backend without propagating the W3C trace
   context. Instrument the caller with an OpenTelemetry HTTP library (see
-  [Configure Linkup](/linkup/guides/configure#remote-services)).
+  [Configure Linkup](configure.md#remote-services)).
 
 #### Session name doesn't match any active session
 
@@ -129,7 +126,7 @@ The headers point to a session that the worker doesn't know about. Common
 causes:
 
 - The session was cleaned up after 7 days of inactivity (see
-  [Managing Sessions](/linkup/guides/sessions#inactive-session-cleanup)). Run
+  [Managing Sessions](sessions.md#inactive-session-cleanup)). Run
   `linkup start` to recreate it.
 - The session was never created in the worker. For example, a typo in a
   hand-crafted `Referer`/`tracestate` header.
@@ -204,3 +201,7 @@ sudo setcap cap_net_bind_service=+ep "$(which linkup)"
 
 `linkup health` reports whether the capability is set under the binary's
 section.
+
+---
+
+← [Updating and Uninstalling](maintaining.md) · [Docs home](../README.md) · [What does a setup look like?](../explanation/what-does-a-setup-look-like.md) →

@@ -1,7 +1,4 @@
----
-title: Using Local DNS
-description: How Linkup's local DNS works and when it's needed
----
+# Using Local DNS
 
 `linkup local-dns` makes your Linkup hostnames (e.g. `slim-gecko.example.com`)
 resolve directly to the local server on your machine, bypassing public DNS and
@@ -56,3 +53,7 @@ linkup local-dns uninstall
 
 This removes the resolver files, removes the CA certificate from your keychain,
 and flushes DNS cache.
+
+---
+
+← [Configure Linkup](configure.md) · [Docs home](../README.md) · [Updating and Uninstalling](maintaining.md) →

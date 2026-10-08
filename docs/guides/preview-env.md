@@ -1,7 +1,4 @@
----
-title: Create a Preview Environment
-description: Connect remote services to a persistent linkup preview environment
----
+# Create a Preview Environment
 
 ## Prerequisites
 
@@ -70,7 +67,7 @@ copied from the config unchanged.
 
 The CLI doesn't talk to your local server, but it does need to reach the
 deployed Linkup worker, so a valid `worker_url` and `worker_token` in your
-config are required. See the [Config Reference](/linkup/reference/config) for
+config are required. See the [Config Reference](../reference/config.md) for
 those fields.
 
 Pass `--print-request` to write the assembled JSON to stdout instead of sending
@@ -90,3 +87,7 @@ linkup sessions list
 | Tunnel required              | Yes                       | No                               |
 | Available when laptop is off | No                        | Yes                              |
 | Use case                     | Local development         | CI/CD, sharing with teammates    |
+
+---
+
+← [Managing Sessions](sessions.md) · [Docs home](../README.md) · [Configure Linkup](configure.md) →

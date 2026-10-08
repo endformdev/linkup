@@ -1,9 +1,4 @@
----
-title: What is Linkup?
-description: An explanation of linkups layout and purpose
-sidebar:
-  order: 1
----
+# What is Linkup?
 
 ## Summary
 
@@ -22,7 +17,7 @@ Each "virtual copy" of a system is called a _linkup session_.
 
 Let’s start with an example setup that linkup aims to help with:
 
-![environment-copies-example](../../../assets/environment-copies-example.png)
+![environment-copies-example](../assets/environment-copies-example.png)
 
 To run Peter, Mary, and Paul's environment, they would each need deployed copies
 of all necessary services: frontend, backend, and auth. Traditionally, that
@@ -38,7 +33,7 @@ this case, we would need 6 running services:
 - 1 for the shared unchanged _frontend_ service
 - 3 changed services
 
-![linkup-routing](../../../assets/linkup-routing.png)
+![linkup-routing](../assets/linkup-routing.png)
 
 For example, Peter here can use a local copy of their web development server,
 but they can use the remote / shared backend server without having to run
@@ -56,3 +51,7 @@ organisations.
 2. The speed at which environments can be created at is often faster.
 3. Linkup also allows engineers to connect _locally running services_ to shared
    environments, so most development setups become cheaper and easier to run.
+
+---
+
+[Docs home](../README.md) · [Deploy to Cloudflare](../guides/deploy-linkup.md) →

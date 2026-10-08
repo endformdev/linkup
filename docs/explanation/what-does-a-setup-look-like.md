@@ -1,9 +1,4 @@
----
-title: What a Linkup setup looks like?
-description: What it could look like to run a full linkup deployment
-sidebar:
-  order: 2
----
+# What a Linkup setup looks like?
 
 We established in the last chapter that Linkup helps you to connect _shared
 unchanged services_ with services that _have changes_.
@@ -24,7 +19,7 @@ Three things may need to be configured in your codebase for linkup to work well:
 3. You may need to instrument your backend services to
    [propagate opentelemetry state](https://opentelemetry.io/docs/concepts/context-propagation/).
 
-More information on configuration [here](/linkup/guides/configure).
+More information on configuration [here](../guides/configure.md).
 
 ### Deploying the unchanged services
 
@@ -76,3 +71,7 @@ On the other hand, if you have a locally running service on localhost, simply
 starting the service and telling linkup that you want it connected by running
 `linkup start` and `linkup route local frontend` would be enough for you to get
 your linkup session running.
+
+---
+
+← [Troubleshooting](../guides/troubleshooting.md) · [Docs home](../README.md) · [How Linkup works](how-it-works.md) →

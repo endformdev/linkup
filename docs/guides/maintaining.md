@@ -1,7 +1,4 @@
----
-title: Updating and Uninstalling
-description: How to keep Linkup up to date and remove it if needed
----
+# Updating and Uninstalling
 
 ## Updating
 
@@ -50,3 +47,7 @@ You will be asked to confirm before anything is removed. On confirmation, it:
    (Cargo or install script)
 4. Removes the `~/.linkup/` directory and all state, certificates, and logs
    stored there
+
+---
+
+← [Local DNS](local-dns.md) · [Docs home](../README.md) · [Troubleshooting](troubleshooting.md) →

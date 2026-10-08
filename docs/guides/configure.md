@@ -1,11 +1,8 @@
----
-title: Configuring Linkup
-description: Using a linkup configuration file to describe the layout of your services
----
+# Configuring Linkup
 
 Linkup is configured using a YAML file. This file describes the services that
 make up your system and how requests should be routed between them. For a
-field-by-field schema, see the [Config Reference](/linkup/reference/config).
+field-by-field schema, see the [Config Reference](../reference/config.md).
 
 ## Example
 
@@ -98,3 +95,7 @@ requirements to work correctly with Linkup:
   headers through its outbound HTTP calls. The easiest way to achieve this is to
   use an OpenTelemetry HTTP instrumentation library.
   [Here is an example for Node.js](https://www.npmjs.com/package/@opentelemetry/instrumentation-http).
+
+---
+
+← [Preview Environments](preview-env.md) · [Docs home](../README.md) · [Local DNS](local-dns.md) →

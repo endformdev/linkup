@@ -1,7 +1,4 @@
----
-title: Shell Completion
-description: Generate shell autocompletions for the linkup CLI
----
+# Shell Completion
 
 `linkup completion` prints a shell-completion script to standard output,
 auto-detecting your shell from `$SHELL`. Pipe it to the right place for your
@@ -51,3 +48,7 @@ To load it inline in a session:
 ```fish
 linkup completion | source
 ```
+
+---
+
+← [Config Reference](config.md) · [Docs home](../README.md) · [Cloudflare Resources](cloudflare-resources.md) →

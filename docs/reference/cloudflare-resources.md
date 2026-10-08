@@ -1,7 +1,4 @@
----
-title: Required Cloudflare Resources
-description: A description of the resources you need to use Linkup with Cloudflare
----
+# Required Cloudflare Resources
 
 Account-scoped:
 
@@ -21,3 +18,7 @@ On the tunnel zone (the first zone passed to `--zone-ids`) only:
 - DNS records for `linkup-tunnel-*` hostnames, created at runtime as sessions
   start
 - A cache rule that excludes those tunnel hostnames from Cloudflare's cache
+
+---
+
+← [Shell Completion](shell-completion.md) · [Docs home](../README.md)

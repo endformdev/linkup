@@ -1,11 +1,8 @@
----
-title: Run a Local Linkup Session
-description: Get started with linkup by running a local linkup session
----
+# Run a Local Linkup Session
 
 ## Prerequisites
 
-- [Linkup deployed to a Cloudflare domain](/linkup/guides/deploy-linkup)
+- [Linkup deployed to a Cloudflare domain](deploy-linkup.md)
 
 ## Installing the CLI
 
@@ -53,7 +50,7 @@ domain. The added block is clearly delimited and is reverted by `linkup stop`.
 
 ### Start modes
 
-See [Managing Sessions](/linkup/guides/sessions) for a full comparison of
+See [Managing Sessions](sessions.md) for a full comparison of
 session types.
 
 ## linkup route
@@ -90,4 +87,8 @@ Stops the local server and the Cloudflare tunnel. Also reverts the env file
 changes that `linkup start` made: the Linkup block is removed from each `.env.*`
 file, restoring the files to their original state.
 
-See [Managing Sessions](/linkup/guides/sessions) for details.
+See [Managing Sessions](sessions.md) for details.
+
+---
+
+← [Deploy to Cloudflare](deploy-linkup.md) · [Docs home](../README.md) · [Managing Sessions](sessions.md) →

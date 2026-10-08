@@ -1,11 +1,8 @@
----
-title: Config Reference
-description: Every field accepted by the linkup configuration file
----
+# Config Reference
 
 A Linkup configuration file is YAML with three top-level keys: `linkup`,
 `services`, and `domains`. This page documents every field. For a worked example
-and conceptual overview, see [Configure Linkup](/linkup/guides/configure).
+and conceptual overview, see [Configure Linkup](../guides/configure.md).
 
 ## Top-level shape
 
@@ -87,7 +84,7 @@ Optional path (relative to your project) where Linkup looks for `.env.*.linkup`
 files when you run `linkup start`. The contents are appended into the matching
 `.env.*` file (e.g. `.env.development.linkup` → `.env.development`) and removed
 by `linkup stop`. See
-[Environment variables for local services](/linkup/guides/configure#environment-variables-for-local-services).
+[Environment variables for local services](../guides/configure.md#environment-variables-for-local-services).
 
 ### `services[].rewrites[]`
 
@@ -166,3 +163,7 @@ domains:
       - path: ^/auth/.*
         service: auth
 ```
+
+---
+
+← [How Linkup works](../explanation/how-it-works.md) · [Docs home](../README.md) · [Shell Completion](shell-completion.md) →
