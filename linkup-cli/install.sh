@@ -3,7 +3,7 @@
 set -e
 
 CHANNEL="stable"
-GITHUB_API="https://api.github.com/repos/mentimeter/linkup"
+GITHUB_API="https://api.github.com/repos/endformdev/linkup"
 
 parse_args() {
     while [[ $# -gt 0 ]]; do

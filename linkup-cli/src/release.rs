@@ -113,7 +113,7 @@ mod github {
     }
 
     pub(super) async fn fetch_stable_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/mentimeter/linkup/releases/latest"
+        let url: Url = "https://api.github.com/repos/endformdev/linkup/releases/latest"
             .parse()
             .expect("GitHub URL to be correct");
 
@@ -121,7 +121,7 @@ mod github {
     }
 
     pub(super) async fn fetch_beta_release() -> Result<Option<Release>, Error> {
-        let url: Url = "https://api.github.com/repos/mentimeter/linkup/releases"
+        let url: Url = "https://api.github.com/repos/endformdev/linkup/releases"
             .parse()
             .expect("GitHub URL to be correct");
 

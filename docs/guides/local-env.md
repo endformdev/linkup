@@ -9,11 +9,11 @@
 ### With the install script (recommended)
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/mentimeter/linkup/refs/heads/main/linkup-cli/install.sh | bash
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/endformdev/linkup/refs/heads/main/linkup-cli/install.sh | bash
 
 # Or to install a pre-release version (beta)
 
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/mentimeter/linkup/refs/heads/main/linkup-cli/install.sh | bash -s -- --channel beta
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/endformdev/linkup/refs/heads/main/linkup-cli/install.sh | bash -s -- --channel beta
 ```
 
 ## Basic workflow

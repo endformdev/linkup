@@ -1,12 +1,15 @@
 name: Create Release
 
 on:
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "Cargo.toml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   check_version:
@@ -14,30 +17,22 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_changed: ${{ steps.check.outputs.version_changed }}
-      version: ${{ steps.check.outputs.version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 2
 
       - name: Check Version
         id: check
         run: |
-          new_version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
-          old_version=$(git show HEAD^:Cargo.toml | grep '^version = ' | sed -E 's/version = "(.*)"/\1/')
+          version=$(grep '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "Version: $version"
 
-          echo "New version: $new_version"
-          echo "Old version: $old_version"
-
-          if [ "$new_version" = "$old_version" ]; then
-            echo "No version change detected."
+          if git ls-remote --exit-code --tags origin "refs/tags/$version" > /dev/null; then
+            echo "Tag $version already exists."
             echo "version_changed=false" >> $GITHUB_OUTPUT
-            echo "new_version=''" >> $GITHUB_OUTPUT
           else
-            echo "Version change detected."
+            echo "Tag $version does not exist yet."
             echo "version_changed=true" >> $GITHUB_OUTPUT
-            echo "new_version=$new_version" >> $GITHUB_OUTPUT
           fi
 
   build:
@@ -49,17 +44,16 @@ jobs:
       matrix:
         include:
           - build: linux
-            os: depot-ubuntu-22.04-8
+            os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
           - build: aarch64
-            os: depot-ubuntu-22.04-arm-8
+            os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            linker: gcc-aarch64-linux-gnu
           - build: macos
-            os: depot-macos-14
+            os: macos-14
             target: x86_64-apple-darwin
           - build: macos-aarch64
-            os: depot-macos-14
+            os: macos-14
             target: aarch64-apple-darwin
     steps:
       - name: Checkout repository
