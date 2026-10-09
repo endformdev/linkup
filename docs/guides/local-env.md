@@ -3,6 +3,8 @@
 ## Prerequisites
 
 - [Linkup deployed to a Cloudflare domain](deploy-linkup.md)
+- [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+  installed, which Linkup uses to create the tunnel to your machine
 
 ## Installing the CLI
 
@@ -14,6 +16,21 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/endformde
 # Or to install a pre-release version (beta)
 
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/endformdev/linkup/refs/heads/main/linkup-cli/install.sh | bash -s -- --channel beta
+```
+
+### From source
+
+With a [Rust toolchain](https://rustup.rs/) installed:
+
+```sh
+cargo install --git https://github.com/endformdev/linkup linkup-cli
+```
+
+On Linux, also allow the binary to bind to ports 80 and 443, which the install
+script does for you:
+
+```sh
+sudo setcap cap_net_bind_service=+ep "$(which linkup)"
 ```
 
 ## Basic workflow
