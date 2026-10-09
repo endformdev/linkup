@@ -18,7 +18,7 @@ version = "4.1.1"
 anyhow = "1.0.102"
 async-trait = "0.1.86"
 axum = { version = "0.8.9", default-features = false }
-base64 = "0.22.1"
+base64 = "0.23.1"
 futures = "0.3.32"
 hex = "0.4.3"
 http = "1.4.0"
