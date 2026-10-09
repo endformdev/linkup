@@ -23,7 +23,14 @@
     },
     {
       "matchManagers": ["cargo"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "rust minor and patch"
+    },
+    {
+      "description": "Minor updates of 0.x crates are breaking in Cargo, so they get their own PRs",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "!/^0\\./",
       "groupName": "rust minor and patch"
     },
     {
