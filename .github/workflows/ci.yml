@@ -8,11 +8,15 @@ permissions:
 
 jobs:
   check:
-    name: Check and Clippy
-    runs-on: ${{ matrix.os }}
+    name: Check and Clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            runner: avrea-ubuntu-latest-4-vcpu
+          - os: macos-latest
+            runner: avrea-macos-26-8-vcpu
     env:
       RUSTFLAGS: -D warnings
     steps:
@@ -38,10 +42,14 @@ jobs:
 
   test:
     name: Test Suite (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            runner: avrea-ubuntu-latest-4-vcpu
+          - os: macos-latest
+            runner: avrea-macos-26-8-vcpu
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@stable
@@ -77,7 +85,7 @@ jobs:
 
   worker-build:
     name: Worker build
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-4-vcpu
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@stable
