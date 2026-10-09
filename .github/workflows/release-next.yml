@@ -34,7 +34,7 @@ jobs:
       version: ${{ steps.generate_version.outputs.version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ needs.resolve-branch.outputs.branch }}
 
@@ -79,7 +79,7 @@ jobs:
             target: aarch64-apple-darwin
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ needs.resolve-branch.outputs.branch }}
 
@@ -94,7 +94,7 @@ jobs:
           rustup target add ${{ matrix.target }}
           rustup show
 
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           key: ${{ matrix.target }}
           cache-on-failure: true
@@ -146,7 +146,7 @@ jobs:
             core.setOutput('checksum_file', checksumFile);
 
       - name: Release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.generate-version.outputs.version }}
           target_commitish: ${{ needs.resolve-branch.outputs.branch }}
