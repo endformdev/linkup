@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "5 days",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["major"],
+      "minimumReleaseAge": "10 days"
+    },
+    {
+      "matchUpdateTypes": ["minor"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "addLabels": ["rust"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "rust minor and patch"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["github-actions"],
+      "groupName": "github actions",
+      "schedule": ["* * * * 1"]
+    },
+    {
+      "matchPackageNames": ["worker", "worker-build"],
+      "groupName": "workers-rs"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "worker-build must match the version of the worker crate",
+      "managerFilePatterns": [
+        "/^linkup-cli/build\\.rs$/",
+        "/^\\.github/workflows/.+\\.ya?ml$/",
+        "/^worker/wrangler\\.toml\\.sample$/"
+      ],
+      "matchStrings": ["worker-build@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "worker-build",
+      "datasourceTemplate": "crate"
+    }
+  ]
+}
