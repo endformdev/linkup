@@ -47,7 +47,7 @@ sysinfo = "0.39.1"
 tar = "0.4.45"
 
 [dev-dependencies]
-mockall = "0.14.0"
+mockall = "0.15.0"
 mockito = "1.7.2"
 
 [features]
