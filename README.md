@@ -84,3 +84,9 @@ linkup stop               # Stop the session and revert env files
 ## Documentation
 
 The full documentation lives in [`docs/`](docs/README.md).
+
+## Acknowledgements
+
+This repository started as a fork of
+[mentimeter/linkup](https://github.com/mentimeter/linkup), originally built by
+[Mentimeter](https://github.com/mentimeter), and is now developed independently.
