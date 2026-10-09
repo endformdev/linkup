@@ -17,4 +17,4 @@ tokio = { workspace = true, features = ["test-util", "macros"] }
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 
-rstest = "0.26.1"
+rstest = "0.27.0"
