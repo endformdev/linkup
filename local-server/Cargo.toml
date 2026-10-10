@@ -22,8 +22,8 @@ tokio-tungstenite = { workspace = true, features = ["rustls-tls-native-roots"] }
 url = { workspace = true }
 
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
-hickory-server = { version = "0.26.1", features = ["resolver"] }
-rcgen = { version = "0.14.8", features = ["x509-parser"] }
+hickory-server = { version = "0.26.3", features = ["resolver"] }
+rcgen = { version = "0.14.10", features = ["x509-parser"] }
 rustls = { workspace = true }
 rustls-pemfile = "2.2.0"
 tower = "0.5.3"

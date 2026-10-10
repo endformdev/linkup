@@ -12,11 +12,11 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 
-http-body = "1.0.1"
-hyper-rustls = { version = "0.27.9", default-features = false, features = [
+http-body = "1.1.0"
+hyper-rustls = { version = "0.27.10", default-features = false, features = [
     "http1",
     "http2",
     "ring",
 ] }
-hyper-util = { version = "0.1.10", features = ["client-legacy"] }
-rustls-native-certs = "0.8.3"
+hyper-util = { version = "0.1.21", features = ["client-legacy"] }
+rustls-native-certs = "0.8.4"
