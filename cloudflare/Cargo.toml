@@ -13,7 +13,7 @@ license = "BSD-3-Clause"
 default = ["default-tls"]
 blocking = ["reqwest/blocking"]
 default-tls = ["reqwest/default-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
+rustls-tls = ["reqwest/rustls"]
 spec = []
 endpoint-spec = []
 
