@@ -32,8 +32,8 @@ cargo install --git https://github.com/endformdev/linkup linkup-cli
 
 Deploy the Linkup worker and the rest of the infrastructure to your Cloudflare
 account (see [Deploy Linkup to Cloudflare](docs/guides/deploy-linkup.md) for
-details). When it finishes, it prints the `worker_url` and `worker_token` to
-use in your config.
+details). When it finishes, it prints the `worker_url` and `worker_token` to use
+in your config.
 
 ```sh
 linkup infra \
@@ -88,5 +88,5 @@ The full documentation lives in [`docs/`](docs/README.md).
 ## Acknowledgements
 
 This repository started as a fork of
-[mentimeter/linkup](https://github.com/mentimeter/linkup), originally built by
+[mentimeter/linkup](https://github.com/mentimeter/linkup), originally built at
 [Mentimeter](https://github.com/mentimeter), and is now developed independently.
